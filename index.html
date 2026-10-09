@@ -190,4 +190,35 @@
           </div>
           
           <div class="bg-slate-50 p-3 rounded-lg border space-y-2 text-xs">
-            <label class="block font-bold text-slate-700">Select Match
+            <label class="block font-bold text-slate-700">Select Match to Generate Result:</label>
+            <div class="flex gap-2">
+              <select id="adminResultMatchSelect" class="flex-1 border rounded px-3 py-2 bg-white font-bold text-xs">
+                <!-- Dynamically populated -->
+              </select>
+              <button onclick="renderAdminStandingsForSelectedMatch()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-bold text-xs shadow-sm">🔄 Generate Result</button>
+            </div>
+          </div>
+
+          <div id="adminStandingsContainer" class="overflow-x-auto pt-1">
+            <table class="w-full text-xs text-left border-collapse border border-slate-200">
+              <thead>
+                <tr class="bg-slate-100 text-slate-700">
+                  <th class="border p-2">Team</th>
+                  <th class="border p-2">Total IMPs</th>
+                  <th class="border p-2">Victory Points (VP)</th>
+                  <th class="border p-2">Status</th>
+                </tr>
+              </thead>
+              <tbody id="adminTableBody">
+                <tr><td colspan="4" class="text-center p-3 text-slate-400">Please select a match and click Generate Result</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Password Modal -->
+  <div id
