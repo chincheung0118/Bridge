@@ -93,7 +93,10 @@
     <!-- ================= ADMIN VIEW ================= -->
     <div id="viewAdmin" class="space-y-4 hidden">
       <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-4">
-        <h2 class="font-bold text-base text-slate-800 border-b pb-2">👑 Tournament Director (Admin) & VP Panel</h2>
+        <div class="flex justify-between items-center border-b pb-2">
+          <h2 class="font-bold text-base text-slate-800">👑 Tournament Director (Admin) & VP Panel</h2>
+          <button onclick="lockAdminDevice()" class="text-[11px] bg-red-100 text-red-700 hover:bg-red-200 font-bold px-2.5 py-1 rounded border border-red-300">🔒 Lock Device</button>
+        </div>
         
         <div class="grid grid-cols-2 gap-3 text-xs">
           <div>
@@ -210,7 +213,7 @@
 
     const suits = ["♣", "♦", "♥", "♠", "NT"];
 
-    let globalState = JSON.parse(localStorage.getItem("bridge_v28_data") || "{}");
+    let globalState = JSON.parse(localStorage.getItem("bridge_v29_data") || "{}");
 
     function getActiveTablesCount(totalTeams) {
       return totalTeams; // 1 team = 1 table station
@@ -226,12 +229,24 @@
 
         for (let i = 1; i <= tablesCount; i++) {
           initialTables[`Table${i}`] = { N: ``, S: ``, E: ``, W: `` };
-          initialScores[`Table${i}`] = generateBoardsArray(boardsCount, i);         }          globalState[matchName] = {           config: { totalTeams: totalTeams, boardsCount: boardsCount, movement: "RoundRobin" },           tables: initialTables,           scores: initialScores         };       } else {         let cfg = globalState[matchName].config;         let tCount = getActiveTablesCount(cfg.totalTeams);         for (let i = 1; i <= tCount; i++) {           let tKey = `Table${i}`;
+          initialScores[`Table${i}`] = generateBoardsArray(boardsCount, i);
+        }
+
+        globalState[matchName] = {
+          config: { totalTeams: totalTeams, boardsCount: boardsCount, movement: "RoundRobin" },
+          tables: initialTables,
+          scores: initialScores
+        };
+      } else {
+        let cfg = globalState[matchName].config;
+        let tCount = getActiveTablesCount(cfg.totalTeams);
+        for (let i = 1; i <= tCount; i++) {
+          let tKey = `Table${i}`;
           if (!globalState[matchName].tables[tKey]) {
             globalState[matchName].tables[tKey] = { N: ``, S: ``, E: ``, W: `` };
           }
           if (!globalState[matchName].scores[tKey] || globalState[matchName].scores[tKey].length !== cfg.boardsCount) {
-            globalState[matchName].scores[tKey] = generateBoardsArray(cfg.boardsCount, i);
+            globalState[matchName].scores[tKey] = generateBoardsArray(boardsCount, i);
           }
         }
       }
@@ -267,7 +282,9 @@
       const select = document.getElementById('roomTypeSelect');
       select.innerHTML = '';
       for (let i = 1; i <= tCount; i++) {
-        let tKey = `Table${i}`;         let t = matchData.tables[tKey];         let nsDesc = (t.N \vert{}\vert{} t.S) ? `(${t.N || 'N'}/${t.S \vert{}\vert{} 'S'})` : `(Team ${i})`;
+        let tKey = `Table${i}`;
+        let t = matchData.tables[tKey];
+        let nsDesc = (t.N || t.S) ? `(${t.N \vert{}\vert{} 'N'}/${t.S || 'S'})` : `(Team ${i})`;
         let opt = document.createElement('option');
         opt.value = tKey;
         opt.innerText = `Table ${i}${nsDesc}`;
@@ -277,9 +294,15 @@
     }
 
     function requestAdminAccess() {
-      document.getElementById('adminPasswordInput').value = '';
-      document.getElementById('passwordModal').classList.add('flex');
-      document.getElementById('passwordModal').classList.remove('hidden');
+      // Check if this device is already authorized as TD
+      const isAuthorized = localStorage.getItem("bridge_admin_authorized") === "true";
+      if (isAuthorized) {
+        switchView('admin');
+      } else {
+        document.getElementById('adminPasswordInput').value = '';
+        document.getElementById('passwordModal').classList.add('flex');
+        document.getElementById('passwordModal').classList.remove('hidden');
+      }
     }
 
     function closePasswordModal() {
@@ -290,11 +313,19 @@
     function verifyAdminPassword() {
       const pwd = document.getElementById('adminPasswordInput').value;
       if (pwd === "Grandslam") {
+        // Authorize this device permanently in localStorage
+        localStorage.setItem("bridge_admin_authorized", "true");
         closePasswordModal();
         switchView('admin');
       } else {
         alert("Incorrect Password! Default password is 'Grandslam'");
       }
+    }
+
+    function lockAdminDevice() {
+      localStorage.removeItem("bridge_admin_authorized");
+      alert("Device locked! Password required on next access.");
+      switchView('scoring');
     }
 
     function switchView(view) {
@@ -323,7 +354,45 @@
     function openSeatingModal() {
       initMatch(currentMatch);
       const t = globalState[currentMatch].tables[currentTableKey];
-      document.getElementById('seatingModalTitle').innerText = `Enter Seating for ${currentTableKey}`;       document.getElementById('inputNorth').value = t.N;       document.getElementById('inputSouth').value = t.S;       document.getElementById('inputEast').value = t.E;       document.getElementById('inputWest').value = t.W;       document.getElementById('seatingModal').classList.add('flex');       document.getElementById('seatingModal').classList.remove('hidden');     }      function closeSeatingModal() {       document.getElementById('seatingModal').classList.add('hidden');       document.getElementById('seatingModal').classList.remove('flex');     }      function saveSeatingModal() {       initMatch(currentMatch);       globalState[currentMatch].tables[currentTableKey] = {         N: document.getElementById('inputNorth').value.trim(),         S: document.getElementById('inputSouth').value.trim(),         E: document.getElementById('inputEast').value.trim(),         W: document.getElementById('inputWest').value.trim()       };       closeSeatingModal();       saveAndRefresh();     }      function updateAdminConfig() {       initMatch(currentMatch);       const teams = parseInt(document.getElementById('adminTotalTeams').value);       const boards = parseInt(document.getElementById('adminBoardsCount').value);       const movement = document.getElementById('adminMovementSelect').value;              globalState[currentMatch].config.totalTeams = teams;       globalState[currentMatch].config.boardsCount = boards;       globalState[currentMatch].config.movement = movement;        let tCount = getActiveTablesCount(teams);       for (let i = 1; i <= tCount; i++) {         let tKey = `Table${i}`;
+      document.getElementById('seatingModalTitle').innerText = `Enter Seating for ${currentTableKey}`;
+      document.getElementById('inputNorth').value = t.N;
+      document.getElementById('inputSouth').value = t.S;
+      document.getElementById('inputEast').value = t.E;
+      document.getElementById('inputWest').value = t.W;
+      document.getElementById('seatingModal').classList.add('flex');
+      document.getElementById('seatingModal').classList.remove('hidden');
+    }
+
+    function closeSeatingModal() {
+      document.getElementById('seatingModal').classList.add('hidden');
+      document.getElementById('seatingModal').classList.remove('flex');
+    }
+
+    function saveSeatingModal() {
+      initMatch(currentMatch);
+      globalState[currentMatch].tables[currentTableKey] = {
+        N: document.getElementById('inputNorth').value.trim(),
+        S: document.getElementById('inputSouth').value.trim(),
+        E: document.getElementById('inputEast').value.trim(),
+        W: document.getElementById('inputWest').value.trim()
+      };
+      closeSeatingModal();
+      saveAndRefresh();
+    }
+
+    function updateAdminConfig() {
+      initMatch(currentMatch);
+      const teams = parseInt(document.getElementById('adminTotalTeams').value);
+      const boards = parseInt(document.getElementById('adminBoardsCount').value);
+      const movement = document.getElementById('adminMovementSelect').value;
+      
+      globalState[currentMatch].config.totalTeams = teams;
+      globalState[currentMatch].config.boardsCount = boards;
+      globalState[currentMatch].config.movement = movement;
+
+      let tCount = getActiveTablesCount(teams);
+      for (let i = 1; i <= tCount; i++) {
+        let tKey = `Table${i}`;
         if (!globalState[currentMatch].tables[tKey]) {
           globalState[currentMatch].tables[tKey] = { N: ``, S: ``, E: ``, W: `` };
         }
@@ -450,312 +519,4 @@
             if (undertricks >= 1) penalty += 100;
             if (undertricks >= 2) penalty += 200;
             if (undertricks >= 3) penalty += 200;
-            if (undertricks > 3) penalty += (undertricks - 3) * 300;
-          } else {
-            if (undertricks >= 1) penalty += 200;
-            if (undertricks > 1) penalty += (undertricks - 1) * 300;
-          }
-        } else if (isRedbl) {
-          if (!isVul) {
-            if (undertricks >= 1) penalty += 200;
-            if (undertricks >= 2) penalty += 400;
-            if (undertricks >= 3) penalty += 400;
-            if (undertricks > 3) penalty += (undertricks - 3) * 600;
-          } else {
-            if (undertricks >= 1) penalty += 400;
-            if (undertricks > 1) penalty += (undertricks - 1) * 600;
-          }
-        }
-        let finalPenalty = -penalty;
-        if (declarer === 'E' || declarer === 'W') finalPenalty = -finalPenalty;
-        return finalPenalty;
-      }
-
-      let trickPts = 0;
-      if (suit === '♣' || suit === '♦') trickPts = l * 20;
-      else if (suit === '♠' || suit === '♥') trickPts = l * 30;
-      else if (suit === 'NT') trickPts = 40 + (l - 1) * 30;
-
-      if (isDbl) trickPts *= 2;
-      if (isRedbl) trickPts *= 4;
-
-      let score = trickPts;
-      if (trickPts >= 100) score += isVul ? 500 : 300;
-      else score += 50;
-
-      if (l === 6) score += isVul ? 750 : 500;
-      if (l === 7) score += isVul ? 1500 : 1000;
-      if (isDbl) score += 50;
-      if (isRedbl) score += 100;
-
-      if (res > 0) {
-        if (!isDbl && !isRedbl) score += res * ((suit === '♣' || suit === '♦') ? 20 : 30);
-        else if (isDbl) score += res * (isVul ? 200 : 100);
-        else if (isRedbl) score += res * (isVul ? 400 : 200);
-      }
-
-      if (declarer === 'E' || declarer === 'W') score = -score;
-      return score;
-    }
-
-    function selectContract(idx, lvl, suit) {
-      const target = getTargetScoring(idx);
-      if (target.status === 'confirmed') return;
-      target.level = lvl.toString();
-      target.suit = suit;
-      target.declarer = ""; target.dbl = ""; target.result = ""; target.score = null;
-      saveAndRefresh();
-    }
-
-    function selectDeclarer(idx, dir) {
-      const target = getTargetScoring(idx);
-      if (target.status === 'confirmed') return;
-      target.declarer = dir;
-      target.dbl = ""; target.result = ""; target.score = null;
-      saveAndRefresh();
-    }
-
-    function selectDouble(idx, dblVal) {
-      const target = getTargetScoring(idx);
-      if (target.status === 'confirmed') return;
-      target.dbl = dblVal;
-      target.result = ""; target.score = null;
-      saveAndRefresh();
-    }
-
-    function selectResult(idx, resVal) {
-      const matchData = globalState[currentMatch];
-      const b = matchData.scores[currentTableKey][idx];
-      const target = getTargetScoring(idx);
-      if (target.status === 'confirmed') return;
-      target.result = resVal.toString();
-      target.score = calculateRawScore(target.level, target.suit, target.declarer, target.dbl, target.result, b.vul);
-      target.status = target.score !== null ? 'pending' : 'draft';
-      saveAndRefresh();
-    }
-
-    function getTargetScoring(idx) {
-      return globalState[currentMatch].scores[currentTableKey][idx].scoring;
-    }
-
-    function confirmScore(idx) {
-      getTargetScoring(idx).status = 'confirmed';
-      saveAndRefresh();
-    }
-
-    function editScore(idx) {
-      getTargetScoring(idx).status = 'pending';
-      saveAndRefresh();
-    }
-
-    function handleHandRecordPhoto(idx, event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const b = globalState[currentMatch].scores[currentTableKey][idx];
-        b.handRecordPhoto = { name: file.name, dataUrl: e.target.result };
-        saveAndRefresh();
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function handleTravelerPhoto(idx, event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const b = globalState[currentMatch].scores[currentTableKey][idx];
-        b.travelerPhoto = { name: file.name, dataUrl: e.target.result };
-        saveAndRefresh();
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function saveAndRefresh() {
-      localStorage.setItem("bridge_v28_data", JSON.stringify(globalState));
-      renderAll();
-    }
-
-    function renderAll() {
-      initMatch(currentMatch);
-      const matchData = globalState[currentMatch];
-      
-      let bannerHTML = '';
-      for (let tKey in matchData.tables) {
-        let t = matchData.tables[tKey];
-        let nsStr = (t.N || t.S) ? `${t.N || 'N'}/${t.S || 'S'}` : 'N/S Team';
-        let ewStr = (t.E || t.W) ? `${t.E || 'E'}/${t.W || 'W'}` : 'E/W Opponent';
-        bannerHTML += `<div class="flex justify-between items-center w-full font-bold"><span class="text-blue-400">${tKey}: ${nsStr} vs ${ewStr}</span></div>`;
-      }
-      document.getElementById('globalRosterBanner').innerHTML = `<div class="max-w-xl mx-auto flex flex-col gap-1">${bannerHTML}</div>`;
-
-      const container = document.getElementById('boardsList');
-      container.innerHTML = '';
-
-      let tableScores = matchData.scores[currentTableKey];
-      let activeTable = matchData.tables[currentTableKey];
-      let totalTableScore = tableScores.reduce((acc, cur) => acc + (cur.scoring.score || 0), 0);
-
-      tableScores.forEach((b, idx) => {
-        let myData = b.scoring;
-        const vulN = b.vul === 'All' || b.vul === 'N-S';
-        const vulS = b.vul === 'All' || b.vul === 'N-S';
-        const vulE = b.vul === 'All' || b.vul === 'E-W';
-        const vulW = b.vul === 'All' || b.vul === 'E-W';
-
-        const isLocked = myData.status === 'confirmed';
-        const step1Done = !!myData.level && !!myData.suit;
-        const step2Done = step1Done && !!myData.declarer;
-        const step3Done = step2Done && myData.dbl !== "";
-
-        let matrixHtml = `<div class="grid grid-cols-5 gap-1">`;
-        for (let l = 1; l <= 7; l++) {
-          suits.forEach(s => {
-            const isSelected = myData.level == l && myData.suit === s;
-            const colorClass = (s === '♥' || s === '♦') ? 'text-red-600' : 'text-slate-800';
-            matrixHtml += `<button ${isLocked ? 'disabled' : ''} onclick="selectContract(${idx}, ${l}, '${s}')" class="contract-btn ${isSelected ? 'selected' : ''} ${colorClass}">${l}${s}</button>`;
-          });
-        }
-        matrixHtml += `</div>`;
-
-        let declarerHtml = '';
-        if (step1Done && !isLocked) {
-          declarerHtml = `
-            <div class="mt-3 pt-2 border-t border-slate-100">
-              <div class="text-[11px] font-bold text-slate-500 mb-2">Step 2: Select Declarer:</div>
-              <div class="flex flex-col items-center max-w-[220px] mx-auto gap-1">
-                <button onclick="selectDeclarer(${idx}, 'N')" class="step-btn w-36 truncate ${myData.declarer === 'N' ? 'selected' : ''}">North (${activeTable.N || 'N'})</button>
-                <div class="flex gap-4 w-full justify-between">
-                  <button onclick="selectDeclarer(${idx}, 'W')" class="step-btn w-24 truncate ${myData.declarer === 'W' ? 'selected' : ''}">West (${activeTable.W || 'W'})</button>
-                  <button onclick="selectDeclarer(${idx}, 'E')" class="step-btn w-24 truncate ${myData.declarer === 'E' ? 'selected' : ''}">East (${activeTable.E || 'E'})</button>
-                </div>
-                <button onclick="selectDeclarer(${idx}, 'S')" class="step-btn w-36 truncate ${myData.declarer === 'S' ? 'selected' : ''}">South (${activeTable.S || 'S'})</button>
-              </div>
-            </div>
-          `;
-        }
-
-        let doubleHtml = '';
-        if (step2Done && !isLocked) {
-          doubleHtml = `
-            <div class="mt-3 pt-2 border-t border-slate-100">
-              <div class="text-[11px] font-bold text-slate-500 mb-1">Step 3: Select Double:</div>
-              <div class="flex gap-1.5">
-                <button onclick="selectDouble(${idx}, 'NONE')" class="step-btn flex-1 py-2 ${myData.dbl === 'NONE' ? 'selected' : ''}">None</button>
-                <button onclick="selectDouble(${idx}, 'X')" class="step-btn flex-1 py-2 ${myData.dbl === 'X' ? 'selected-dbl' : ''}">X (Dbl)</button>
-                <button onclick="selectDouble(${idx}, 'XX')" class="step-btn flex-1 py-2 ${myData.dbl === 'XX' ? 'selected-dbl' : ''}">XX (Rdbl)</button>
-              </div>
-            </div>
-          `;
-        }
-
-        let resultHtml = '';
-        if (step3Done && !isLocked) {
-          const levelNum = parseInt(myData.level);
-          const maxOver = 7 - levelNum;
-          const maxUnder = levelNum + 6;
-
-          let overButtonsHtml = '';
-          for (let i = 1; i <= maxOver; i++) {
-            overButtonsHtml += `<button onclick="selectResult(${idx}, '${i}')" class="res-btn ${myData.result == i ? 'selected' : ''}">+${i}</button>`;
-          }
-          let underButtonsHtml = '';
-          for (let i = 1; i <= maxUnder; i++) {
-            underButtonsHtml += `<button onclick="selectResult(${idx}, '${-i}')" class="res-btn ${myData.result == -i ? 'selected' : ''}">-${i}</button>`;
-          }
-
-          resultHtml = `
-            <div class="mt-3 pt-2 border-t border-slate-100 space-y-2">
-              <div class="text-[11px] font-bold text-slate-500">Step 4: Select Result:</div>
-              ${maxOver > 0 ? `<div><div class="text-[10px] text-blue-600 font-semibold mb-1">Overtricks:</div><div class="grid grid-cols-7 gap-1">${overButtonsHtml}</div></div>` : ''}
-              <div class="flex justify-center py-1">
-                <button onclick="selectResult(${idx}, '0')" class="w-full py-2.5 rounded-lg border text-base font-black shadow-sm ${myData.result === '0' ? 'bg-blue-600 text-white border-blue-700' : 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'}">= (Made)</button>
-              </div>
-              <div><div class="text-[10px] text-red-600 font-semibold mb-1">Undertricks:</div><div class="grid grid-cols-7 gap-1">${underButtonsHtml}</div></div>
-            </div>
-          `;
-        }
-
-        const hasHandRec = b.handRecordPhoto;
-        const hasTraveler = b.travelerPhoto;
-
-        const card = document.createElement('div');
-        card.className = "bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-2";
-        card.innerHTML = `
-          <div class="flex justify-between items-center border-b pb-2">
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-base text-slate-800">Board ${b.boardNum}</span>
-              <span class="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600">Vul: ${b.vul}</span>
-            </div>
-            <div class="flex text-xs font-semibold rounded overflow-hidden border">
-              <span class="px-1.5 py-0.5 ${vulN ? 'vul-active' : 'bg-slate-50 text-slate-400'}">N</span>
-              <span class="px-1.5 py-0.5 ${vulS ? 'vul-active' : 'bg-slate-50 text-slate-400'}">S</span>
-              <span class="px-1.5 py-0.5 ${vulE ? 'vul-active' : 'bg-slate-50 text-slate-400'}">E</span>
-              <span class="px-1.5 py-0.5 ${vulW ? 'vul-active' : 'bg-slate-50 text-slate-400'}">W</span>
-            </div>
-          </div>
-
-          <!-- Hand Record & Traveler Photo Section -->
-          <div class="grid grid-cols-2 gap-2 text-xs pt-1">
-            <div class="bg-slate-50 p-2 rounded border flex flex-col justify-between">
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-slate-600 font-medium">♠️ Hand Record:</span>
-                <span class="font-bold ${hasHandRec ? 'text-green-600' : 'text-amber-600'}">${hasHandRec ? '✅' : '⏳'}</span>
-              </div>
-              <label class="bg-slate-800 hover:bg-slate-900 text-white py-1 rounded cursor-pointer text-center font-bold">
-                ${hasHandRec ? 'Change' : 'Upload Hand Rec'}
-                <input type="file" accept="image/*" onchange="handleHandRecordPhoto(${idx}, event)" class="hidden">
-              </label>
-            </div>
-
-            <div class="bg-slate-50 p-2 rounded border flex flex-col justify-between">
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-slate-600 font-medium">📋 Traveler / Result:</span>
-                <span class="font-bold ${hasTraveler ? 'text-green-600' : 'text-amber-600'}">${hasTraveler ? '✅' : '⏳'}</span>
-              </div>
-              <label class="bg-blue-600 hover:bg-blue-700 text-white py-1 rounded cursor-pointer text-center font-bold">
-                ${hasTraveler ? 'Change' : 'Upload Traveler'}
-                <input type="file" accept="image/*" onchange="handleTravelerPhoto(${idx}, event)" class="hidden">
-              </label>
-            </div>
-          </div>
-
-          <div><div class="text-[11px] font-bold text-slate-500 mb-1">Step 1: Select Contract (1♣ - 7NT):</div>${matrixHtml}</div>
-          ${declarerHtml}
-          ${doubleHtml}
-          ${resultHtml}
-
-          <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs mt-3">
-            <div>
-              <span class="font-bold text-slate-700">Contract:</span> 
-              <span class="font-bold text-blue-600">
-                ${myData.level ? myData.level + myData.suit : '-'}
-                ${myData.declarer ? ' by ' + myData.declarer : ''}
-                ${myData.dbl && myData.dbl !== 'NONE' ? ' ' + myData.dbl : ''}
-                ${myData.result !== "" ? ' (' + (myData.result === '0' ? '=' : parseInt(myData.result) > 0 ? '+' + myData.result : myData.result) + ')' : ''}
-              </span>
-              <br>
-              <span class="font-bold text-slate-700">Score:</span> <span class="font-black text-slate-900">${myData.score !== null ? (myData.score > 0 ? '+' + myData.score : myData.score) : '-'}</span>
-            </div>
-            <div>
-              ${myData.status === 'pending' ? `<button onclick="confirmScore(${idx})" class="bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1.5 rounded text-xs shadow-sm">✅ Confirm</button>` : myData.status === 'confirmed' ? `<button onclick="editScore(${idx})" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2.5 py-1 rounded text-xs border border-slate-300">✏️ Edit</button>` : ''}
-            </div>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-
-      document.getElementById('matchSummaryTitle').innerText = `${currentTableKey} Cumulative Raw Score`;
-      document.getElementById('teamANameLabel').innerText = `${currentTableKey} N/S`;
-      document.getElementById('teamBNameLabel').innerText = `${currentTableKey} E/W`;
-      document.getElementById('teamAScore').innerText = totalTableScore;
-      document.getElementById('teamBScore').innerText = 0;
-    }
-
-    initMatch(currentMatch);
-    updateTableDropdown();
-    renderAll();
-  </script>
-</body>
-</html>
+            
