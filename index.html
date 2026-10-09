@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-HK">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +8,9 @@
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     .vul-active { background-color: #ef4444 !important; color: #ffffff !important; font-weight: bold; }
-    select:disabled { background-color: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
+    select:disabled, button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .contract-btn { font-size: 11px; padding: 4px 2px; border-radius: 4px; border: 1px solid #cbd5e1; font-weight: 600; background-color: #f8fafc; }
+    .contract-btn.selected { background-color: #2563eb !important; color: #ffffff !important; border-color: #1d4ed8 !important; }
   </style>
 </head>
 <body class="bg-slate-100 min-h-screen pb-12 text-slate-800">
@@ -68,7 +70,9 @@
       "All", "None", "N-S", "E-W"
     ];
 
-    let boardsData = JSON.parse(localStorage.getItem("bridge_v7_data") || "{}");
+    const suits = ["♣", "♦", "♥", "♠", "NT"];
+
+    let boardsData = JSON.parse(localStorage.getItem("bridge_v8_matrix_data") || "{}");
 
     function initData(room) {
       if (!boardsData[room]) {
@@ -185,34 +189,35 @@
       return diff >= 0 ? imp : -imp;
     }
 
+    function selectContractMatrix(idx, roomKey, lvl, suit) {
+      const b = boardsData[currentRoom][idx];
+      const target = roomKey === 'open' ? b.open : b.closed;
+
+      if (target.status === 'confirmed') return;
+
+      target.level = lvl.toString();
+      target.suit = suit;
+      
+      // Reset subsequent steps
+      target.declarer = "";
+      target.dbl = "";
+      target.result = "";
+      target.score = null;
+
+      saveAndRefresh();
+    }
+
     function updateScoreInput(idx, roomKey, changedStep) {
       const b = boardsData[currentRoom][idx];
       const target = roomKey === 'open' ? b.open : b.closed;
 
-      target.level = document.getElementById(`${roomKey}-level-${idx}`).value;
-
-      if (changedStep <= 1 && !target.level) {
-        target.suit = ""; target.declarer = ""; target.dbl = ""; target.result = "";
-      } else {
-        target.suit = document.getElementById(`${roomKey}-suit-${idx}`).value;
-      }
-
-      if (changedStep <= 2 && !target.suit) {
-        target.declarer = ""; target.dbl = ""; target.result = "";
-      } else {
+      if (changedStep === 3) {
         target.declarer = document.getElementById(`${roomKey}-declarer-${idx}`).value;
-      }
-
-      if (changedStep <= 3 && !target.declarer) {
         target.dbl = ""; target.result = "";
-      } else {
+      } else if (changedStep === 4) {
         target.dbl = document.getElementById(`${roomKey}-dbl-${idx}`).value;
-      }
-
-      if (changedStep <= 4 && target.dbl === "") {
         target.result = "";
-      } else {
-        updateResultDropdown(idx, roomKey, target.level, target.result);
+      } else if (changedStep === 5) {
         target.result = document.getElementById(`${roomKey}-result-${idx}`).value;
       }
 
@@ -226,7 +231,7 @@
       const select = document.getElementById(`${roomKey}-result-${idx}`);
       if (!select) return;
 
-      let html = '<option value="">5. Result</option><option value="0" ' + (selectedVal === "0" ? 'selected' : '') + '>=</option>';
+      let html = '<option value="">Result</option><option value="0" ' + (selectedVal === "0" ? 'selected' : '') + '>=</option>';
 
       if (levelStr) {
         const level = parseInt(levelStr);
@@ -258,7 +263,7 @@
     }
 
     function saveAndRefresh() {
-      localStorage.setItem("bridge_v7_data", JSON.stringify(boardsData));
+      localStorage.setItem("bridge_v8_matrix_data", JSON.stringify(boardsData));
       renderBoards();
     }
 
@@ -292,10 +297,26 @@
 
         const isLocked = myData.status === 'confirmed';
 
-        const step1Done = !!myData.level;
-        const step2Done = step1Done && !!myData.suit;
-        const step3Done = step2Done && !!myData.declarer;
-        const step4Done = step3Done && myData.dbl !== "";
+        const step1Done = !!myData.level && !!myData.suit;
+        const step2Done = step1Done && !!myData.declarer;
+        const step3Done = step2Done && myData.dbl !== "";
+
+        // Build 5x7 Contract Matrix HTML
+        let matrixHtml = `<div class="grid grid-cols-5 gap-1 mb-2">`;
+        for (let l = 1; l <= 7; l++) {
+          suits.forEach(s => {
+            const isSelected = myData.level == l && myData.suit === s;
+            const isRedSuit = s === '♥' || s === '♦';
+            const colorClass = isRedSuit ? 'text-red-600' : 'text-slate-800';
+            matrixHtml += `
+              <button ${isLocked ? 'disabled' : ''} onclick="selectContractMatrix(${idx}, '${myRoomKey}', ${l}, '${s}')" 
+                      class="contract-btn ${isSelected ? 'selected' : ''} ${colorClass}">
+                ${l}${s}
+              </button>
+            `;
+          });
+        }
+        matrixHtml += `</div>`;
 
         const card = document.createElement('div');
         card.className = "bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-3";
@@ -314,39 +335,36 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-5 gap-1 text-xs">
-            <select id="${myRoomKey}-level-${idx}" ${isLocked ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 1)" class="border rounded p-1 bg-slate-50">
-              <option value="">1. Lvl</option>
-              ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${myData.level == n ? 'selected' : ''}>${n}</option>`).join('')}
-            </select>
+          <!-- 5x7 Contract Selection Matrix -->
+          <div>
+            <div class="text-[11px] font-semibold text-slate-500 mb-1">Select Contract (1♣ - 7NT):</div>
+            ${matrixHtml}
+          </div>
 
-            <select id="${myRoomKey}-suit-${idx}" ${isLocked || !step1Done ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 2)" class="border rounded p-1 bg-slate-50 font-bold">
-              <option value="">2. Suit</option>
-              <option value="♠" ${myData.suit === '♠' ? 'selected' : ''}>♠</option>
-              <option value="♥" ${myData.suit === '♥' ? 'selected' : ''}>♥</option>
-              <option value="♦" ${myData.suit === '♦' ? 'selected' : ''}>♦</option>
-              <option value="♣" ${myData.suit === '♣' ? 'selected' : ''}>♣</option>
-              <option value="NT" ${myData.suit === 'NT' ? 'selected' : ''}>NT</option>
-            </select>
-
-            <select id="${myRoomKey}-declarer-${idx}" ${isLocked || !step2Done ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 3)" class="border rounded p-1 bg-slate-50">
-              <option value="">3. By</option>
+          <!-- Sequential Controls: Declarer -> Double -> Result -->
+          <div class="grid grid-cols-3 gap-1.5 text-xs">
+            <!-- 3rd: Declarer Direction -->
+            <select id="${myRoomKey}-declarer-${idx}" ${isLocked || !step1Done ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 3)" class="border rounded p-1.5 bg-slate-50">
+              <option value="">By</option>
               ${['N','S','E','W'].map(d => `<option value="${d}" ${myData.declarer === d ? 'selected' : ''}>${d}</option>`).join('')}
             </select>
 
-            <select id="${myRoomKey}-dbl-${idx}" ${isLocked || !step3Done ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 4)" class="border rounded p-1 bg-slate-50 font-semibold text-red-600">
-              <option value="">4. Dbl?</option>
+            <!-- 4th: Double / Redouble -->
+            <select id="${myRoomKey}-dbl-${idx}" ${isLocked || !step2Done ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 4)" class="border rounded p-1.5 bg-slate-50 font-semibold text-red-600">
+              <option value="">Dbl?</option>
               <option value="NONE" ${myData.dbl === 'NONE' ? 'selected' : ''}>No (---)</option>
               <option value="X" ${myData.dbl === 'X' ? 'selected' : ''}>X</option>
               <option value="XX" ${myData.dbl === 'XX' ? 'selected' : ''}>XX</option>
             </select>
 
-            <select id="${myRoomKey}-result-${idx}" ${isLocked || !step4Done ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 5)" class="border rounded p-1 bg-slate-50">
+            <!-- 5th: Result -->
+            <select id="${myRoomKey}-result-${idx}" ${isLocked || !step3Done ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 5)" class="border rounded p-1.5 bg-slate-50">
             </select>
           </div>
 
           <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs">
             <div>
+              Contract: <span class="font-bold text-blue-600">${myData.level && myData.suit ? myData.level + myData.suit : '-'}</span> | 
               Score: <span class="font-bold text-slate-800">${myData.score !== null ? (myData.score > 0 ? '+' + myData.score : myData.score) : '-'}</span>
             </div>
             <div>
