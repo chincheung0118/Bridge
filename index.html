@@ -282,18 +282,33 @@
   </div>
 
   <script>
-    let db = JSON.parse(localStorage.getItem("bridge_v40_db") || "null");
+    // Bulletproof DB Initialization & Migration Check
+    let db = JSON.parse(localStorage.getItem("bridge_v42_db") || "null");
 
-    if (!db) {
+    if (!db || !db.matches || typeof db.matches !== 'object') {
       db = {
         matches: {
-          "Match 1": { status: "open", config: { totalTeams: 3, boardsCount: 2, movement: "RoundRobin" }, tables: {}, scores: {} }
+          "Match 1": { 
+            status: "open", 
+            config: { totalTeams: 3, boardsCount: 2, movement: "RoundRobin" }, 
+            tables: {}, 
+            scores: {} 
+          }
         },
         currentMatch: "Match 1"
       };
-      initMatchStructure("Match 1");
-      saveDB();
     }
+
+    // Ensure currentMatch is valid
+    if (!db.currentMatch || !db.matches[db.currentMatch]) {
+      let openKeys = Object.keys(db.matches).filter(k => db.matches[k] && db.matches[k].status === 'open');
+      db.currentMatch = openKeys.length > 0 ? openKeys[0] : Object.keys(db.matches)[0] || "";
+    }
+
+    if (db.currentMatch && db.matches[db.currentMatch]) {
+      initMatchStructure(db.currentMatch);
+    }
+    saveDB();
 
     let currentTableKey = "Table1";
 
@@ -313,86 +328,21 @@
     function initMatchStructure(matchName) {
       if (!db.matches[matchName]) return;
       let m = db.matches[matchName];
+      if (!m.config) m.config = { totalTeams: 3, boardsCount: 2, movement: "RoundRobin" };
+      if (!m.tables) m.tables = {};
+      if (!m.scores) m.scores = {};
+      
       let tCount = getActiveTablesCount(m.config.totalTeams);
       for (let i = 1; i <= tCount; i++) {
-        let tKey = `Table${i}`;
-        if (!m.tables[tKey]) {
-          m.tables[tKey] = { N: ``, S: ``, E: ``, W: `` };
-        }
-        if (!m.scores[tKey] || m.scores[tKey].length !== m.config.boardsCount) {
-          m.scores[tKey] = generateBoardsArray(m.config.boardsCount, i);
-        }
-      }
-    }
-
-    function generateBoardsArray(boardsCount, tableIndex) {
-      let startBoard = ((tableIndex - 1) * boardsCount) + 1;
-      return Array.from({ length: boardsCount }, (_, idx) => {
-        let bNum = startBoard + idx;
-        return {
-          boardNum: bNum,
-          vul: defaultVulSchedule[(bNum - 1) % 16],
-          handRecordPhoto: null,
-          travelerPhoto: null,
-          scoring: { level: "", suit: "", declarer: "", dbl: "", result: "", score: null, status: "draft" }
-        };
-      });
-    }
-
-    function refreshMatchDropdowns() {
-      const select = document.getElementById('matchDropdownSelect');
-      if (!select) return;
-      select.innerHTML = '<option value="">-- Select Open Match --</option>';
-      for (let mName in db.matches) {
-        let m = db.matches[mName];
-        if (m.status === 'open') {
-          let opt = document.createElement('option');
-          opt.value = mName;
-          opt.innerText = mName + " (Open)";
-          if (mName === db.currentMatch) opt.selected = true;
-          select.appendChild(opt);
-        }
-      }
-    }
-
-    function joinSelectedMatch() {
-      const select = document.getElementById('matchDropdownSelect');
-      const val = select.value;
-      if (!val) return alert("Please select an open match!");
-      db.currentMatch = val;
-      initMatchStructure(db.currentMatch);
-      updateTableDropdown();
-      saveAndRefresh();
-    }
-
-    function createMatchByAdmin() {
-      const nameInput = document.getElementById('newMatchNameInput');
-      const name = nameInput.value.trim();
-      const teams = parseInt(document.getElementById('newMatchTeams').value);
-      const boards = parseInt(document.getElementById('newMatchBoards').value);
-      const movement = document.getElementById('newMatchMovement').value;
-
-      if (!name) return alert("Please enter a match name!");
-      if (db.matches[name]) return alert("Match name already exists!");
-
-      db.matches[name] = {
-        status: "open",
-        config: { totalTeams: teams, boardsCount: boards, movement: movement },
-        tables: {},
-        scores: {}
-      };
-      initMatchStructure(name);
-      nameInput.value = "";
-      db.currentMatch = name;
-      saveAndRefresh();
-      alert(`Match '${name}' created successfully and set as active!`);
+        let tKey = `Table${i}`;         if (!m.tables[tKey]) {           m.tables[tKey] = { N: ``, S: ``, E: ``, W: `` };         }         if (!m.scores[tKey] \vert{}\vert{} m.scores[tKey].length !== m.config.boardsCount) {           m.scores[tKey] = generateBoardsArray(m.config.boardsCount, i);         }       }     }      function generateBoardsArray(boardsCount, tableIndex) {       let startBoard = ((tableIndex - 1) * boardsCount) + 1;       return Array.from({ length: boardsCount }, (_, idx) => {         let bNum = startBoard + idx;         return {           boardNum: bNum,           vul: defaultVulSchedule[(bNum - 1) \% 16],           handRecordPhoto: null,           travelerPhoto: null,           scoring: { level: "", suit: "", declarer: "", dbl: "", result: "", score: null, status: "draft" }         };       });     }      function refreshMatchDropdowns() {       const select = document.getElementById('matchDropdownSelect');       if (!select) return;       select.innerHTML = '<option value="">-- Select Open Match --</option>';       for (let mName in db.matches) {         let m = db.matches[mName];         if (m && m.status === 'open') {           let opt = document.createElement('option');           opt.value = mName;           opt.innerText = mName + " (Open)";           if (mName === db.currentMatch) opt.selected = true;           select.appendChild(opt);         }       }     }      function joinSelectedMatch() {       const select = document.getElementById('matchDropdownSelect');       const val = select.value;       if (!val) return alert("Please select an open match!");       db.currentMatch = val;       initMatchStructure(db.currentMatch);       currentTableKey = "Table1";       updateTableDropdown();       saveAndRefresh();     }      function createMatchByAdmin() {       const nameInput = document.getElementById('newMatchNameInput');       const name = nameInput.value.trim();       const teams = parseInt(document.getElementById('newMatchTeams').value);       const boards = parseInt(document.getElementById('newMatchBoards').value);       const movement = document.getElementById('newMatchMovement').value;        if (!name) return alert("Please enter a match name!");       if (db.matches[name]) return alert("Match name already exists!");        db.matches[name] = {         status: "open",         config: { totalTeams: teams, boardsCount: boards, movement: movement },         tables: {},         scores: {}       };       initMatchStructure(name);       nameInput.value = "";       db.currentMatch = name;       currentTableKey = "Table1";       saveAndRefresh();       renderAdminPanel();       alert(`Match '${name}' created successfully and set as active!`);
     }
 
     function toggleMatchStatus(matchName) {
+      if (!db.matches[matchName]) return;
       if (db.matches[matchName].status === 'open') {
         db.matches[matchName].status = 'closed';
         if (db.currentMatch === matchName) {
-          let openMatches = Object.keys(db.matches).filter(k => db.matches[k].status === 'open');
+          let openMatches = Object.keys(db.matches).filter(k => db.matches[k] && db.matches[k].status === 'open');
           db.currentMatch = openMatches.length > 0 ? openMatches[0] : "";
         }
       } else {
@@ -400,16 +350,18 @@
         db.currentMatch = matchName;
       }
       saveAndRefresh();
+      renderAdminPanel();
     }
 
     function deleteMatchByAdmin(matchName) {
+      if (!db.matches[matchName]) return;
       if (db.matches[matchName].status === 'open') {
         return alert("Cannot delete an OPEN match. Please close it first.");
       }
       if (confirm(`⚠️ RECONFIRM: Are you sure you want to permanently delete match '${matchName}'? This action cannot be undone.`)) {
         delete db.matches[matchName];
         if (db.currentMatch === matchName) {
-          let openMatches = Object.keys(db.matches).filter(k => db.matches[k].status === 'open');
+          let openMatches = Object.keys(db.matches).filter(k => db.matches[k] && db.matches[k].status === 'open');
           db.currentMatch = openMatches.length > 0 ? openMatches[0] : "";
         }
         saveAndRefresh();
@@ -439,12 +391,10 @@
       if (!select) return;
       select.innerHTML = '';
       for (let i = 1; i <= tCount; i++) {
-        let tKey = `Table${i}`;
-        let t = m.tables[tKey] || { N: '', S: '', E: '', W: '' };
-        let nsDesc = (t.N || t.S) ? `(${t.N || 'N'}/${t.S || 'S'})` : `(Team ${i})`;
+        let tKey = `Table${i}`;         let t = m.tables[tKey] \vert{}\vert{} { N: '', S: '', E: '', W: '' };         let nsDesc = (t.N \vert{}\vert{} t.S) ? `(${t.N || 'N'}/${t.S \vert{}\vert{} 'S'})` : `(Team ${i})`;
         let opt = document.createElement('option');
         opt.value = tKey;
-        opt.innerText = `Table ${i} ${nsDesc}`;
+        opt.innerText = `Table ${i}${nsDesc}`;
         if (tKey === currentTableKey) opt.selected = true;
         select.appendChild(opt);
       }
@@ -530,11 +480,10 @@
       const t = m.tables[currentTableKey] || { N: '', S: '', E: '', W: '' };
       
       let tableIndex = parseInt(currentTableKey.replace('Table', ''));
-      let nsTeam = `Team ${tableIndex}`;
-      let ewTeam = `Opponent / Team ${(tableIndex % m.config.totalTeams) + 1}`;
+      let nsTeam = `Team ${tableIndex}`;       let ewTeam = `Opponent / Team ${(tableIndex % m.config.totalTeams) + 1}`;
 
       document.getElementById('seatingModalTitle').innerText = `🧭 Compass Seating for ${currentTableKey}`;
-      document.getElementById('seatingTableAffiliation').innerText = `${nsTeam} (NS) vs ${ewTeam} (EW)`;
+      document.getElementById('seatingTableAffiliation').innerText = `${nsTeam} (NS) vs${ewTeam} (EW)`;
       document.getElementById('labelTeamN').innerText = nsTeam;
       document.getElementById('labelTeamS').innerText = nsTeam;
       document.getElementById('labelTeamW').innerText = ewTeam;
@@ -621,12 +570,12 @@
       for (let i = 1; i <= tablesNeeded; i++) {
         let startB = ((i - 1) * boardsPerRound) + 1;
         let endB = i * boardsPerRound;
-        placementHTML += `<div>• <b>Boards ${startB} - ${endB}</b> placed at <b>Table ${i}</b> (Team ${i} Station).</div>`;
+        placementHTML += `<div>• <b>Boards ${startB} -${endB}</b> placed at <b>Table ${i}</b> (Team${i} Station).</div>`;
       }
 
       let hasBye = totalTeams % 2 !== 0;
       let standbyMsg = hasBye 
-        ? `<div class="text-red-700 font-bold">• Standby / BYE: Team ${totalTeams} is resting/standby between Table ${tablesNeeded} and scoring desk.</div>` 
+        ? `<div class="text-red-700 font-bold">• Standby / BYE: Team ${totalTeams} is resting/standby between Table${tablesNeeded} and scoring desk.</div>` 
         : `<div>• Standby / BYE: None (Even number of teams).</div>`;
 
       let prepHTML = `
@@ -636,8 +585,7 @@
         <div>• <b>Boards per Round:</b> ${boardsPerRound} boards per table.</div>
         <div>• <b>Total Board Sets Needed:</b> ${totalBoardsNeeded} boards in total.</div>
         <div class="border-t border-amber-200 pt-1 mt-1 font-bold text-amber-900">Exact Board Placement:</div>
-        ${placementHTML}
-        ${hasBye ? standbyMsg : ''}
+        ${placementHTML}${hasBye ? standbyMsg : ''}
       `;
       document.getElementById('materialPrepContent').innerHTML = prepHTML;
 
@@ -682,7 +630,7 @@
 
         standingsHTML += `
           <tr>
-            <td class="border p-2 font-bold">Team ${i} (Table ${i})</td>
+            <td class="border p-2 font-bold">Team ${i} (Table${i})</td>
             <td class="border p-2 text-blue-600 font-bold">${totalImp >= 0 ? '+' + totalImp : totalImp} IMPs</td>
             <td class="border p-2 text-purple-700 font-black">${vp} VP</td>
             <td class="border p-2 text-green-600 font-semibold">${m.status.toUpperCase()}</td>
@@ -907,7 +855,7 @@
     }
 
     function saveDB() {
-      localStorage.setItem("bridge_v40_db", JSON.stringify(db));
+      localStorage.setItem("bridge_v42_db", JSON.stringify(db));
     }
 
     function saveAndRefresh() {
@@ -936,9 +884,9 @@
       
       for (let tKey in m.tables) {
         let t = m.tables[tKey];
-        let nsStr = (t.N || t.S) ? `${t.N || 'N'}, ${t.S || 'S'}` : 'N/S Unassigned';
-        let ewStr = (t.E || t.W) ? `${t.E || 'E'}, ${t.W || 'W'}` : 'E/W Unassigned';
-        bannerHTML += `<div class="flex justify-between items-center w-full text-[11px]"><span class="text-blue-300">📍 ${tKey}:</span> <span class="text-slate-100 font-semibold">[NS: ${nsStr}] vs [EW: ${ewStr}]</span></div>`;
+        let nsStr = (t.N || t.S) ? `${t.N \vert{}\vert{} 'N'},${t.S || 'S'}` : 'N/S Unassigned';
+        let ewStr = (t.E || t.W) ? `${t.E \vert{}\vert{} 'E'},${t.W || 'W'}` : 'E/W Unassigned';
+        bannerHTML += `<div class="flex justify-between items-center w-full text-[11px]"><span class="text-blue-300">📍 ${tKey}:</span> <span class="text-slate-100 font-semibold">[NS: ${nsStr}] vs [EW:${ewStr}]</span></div>`;
       }
 
       let teamPlayers = {};
@@ -958,7 +906,7 @@
       for (let teamId = 1; teamId <= m.config.totalTeams; teamId++) {
         let pList = [...new Set(teamPlayers[teamId])];
         let pStr = pList.length > 0 ? pList.join(', ') : '(No players entered yet)';
-        bannerHTML += `<div class="text-[11px] text-slate-300">• <b>Team ${teamId}:</b> ${pStr}</div>`;
+        bannerHTML += `<div class="text-[11px] text-slate-300">• <b>Team ${teamId}:</b>${pStr}</div>`;
       }
 
       bannerEl.innerHTML = `<div class="max-w-xl mx-auto flex flex-col gap-0.5">${bannerHTML}</div>`;
@@ -1086,47 +1034,4 @@
                 <span class="font-bold ${hasTraveler ? 'text-green-600' : 'text-amber-600'}">${hasTraveler ? '✅' : '⏳'}</span>
               </div>
               <label class="bg-blue-600 hover:bg-blue-700 text-white py-1 rounded cursor-pointer text-center font-bold">
-                ${hasTraveler ? 'Change' : 'Upload Traveler'}
-                <input type="file" accept="image/*" onchange="handleTravelerPhoto(${idx}, event)" class="hidden">
-              </label>
-            </div>
-          </div>
-
-          <div><div class="text-[11px] font-bold text-slate-500 mb-1">Step 1: Select Contract (1♣ - 7NT):</div>${matrixHtml}</div>
-          ${declarerHtml}
-          ${doubleHtml}
-          ${resultHtml}
-
-          <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs mt-3">
-            <div>
-              <span class="font-bold text-slate-700">Contract:</span> 
-              <span class="font-bold text-blue-600">
-                ${myData.level ? myData.level + myData.suit : '-'}
-                ${myData.declarer ? ' by ' + myData.declarer : ''}
-                ${myData.dbl && myData.dbl !== 'NONE' ? ' ' + myData.dbl : ''}
-                ${myData.result !== "" ? ' (' + (myData.result === '0' ? '=' : parseInt(myData.result) > 0 ? '+' + myData.result : myData.result) + ')' : ''}
-              </span>
-              <br>
-              <span class="font-bold text-slate-700">Score:</span> <span class="font-black text-slate-900">${myData.score !== null ? (myData.score > 0 ? '+' + myData.score : myData.score) : '-'}</span>
-            </div>
-            <div>
-              ${myData.status === 'pending' ? `<button onclick="confirmScore(${idx})" class="bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1.5 rounded text-xs shadow-sm">✅ Confirm</button>` : myData.status === 'confirmed' ? `<button onclick="editScore(${idx})" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2.5 py-1 rounded text-xs border border-slate-300">✏️ Edit</button>` : ''}
-            </div>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-
-      document.getElementById('matchSummaryTitle').innerText = `${currentTableKey} Cumulative Raw Score`;
-      document.getElementById('teamANameLabel').innerText = `${currentTableKey} N/S`;
-      document.getElementById('teamBNameLabel').innerText = `${currentTableKey} E/W`;
-      document.getElementById('teamAScore').innerText = totalTableScore;
-      document.getElementById('teamBScore').innerText = 0;
-    }
-
-    refreshMatchDropdowns();
-    updateTableDropdown();
-    renderAll();
-  </script>
-</body>
-</html>
+                ${hasTraveler ? 'Change' : 'Upload Traveler
