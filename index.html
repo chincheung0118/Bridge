@@ -284,7 +284,7 @@
   <script>
     let db = null;
     try {
-      db = JSON.parse(localStorage.getItem("bridge_v48_db") || "null");
+      db = JSON.parse(localStorage.getItem("bridge_v49_db") || "null");
     } catch (e) {
       db = null;
     }
@@ -888,4 +888,66 @@
 
     function selectResult(idx, resVal) {
       const m = db.matches[db.currentMatch];
-      if (!m)
+      if (!m) return;
+      const b = m.scores[currentTableKey][idx];
+      const target = getTargetScoring(idx);
+      if (!target || target.status === 'confirmed') return;
+      target.result = resVal.toString();
+      target.score = calculateRawScore(target.level, target.suit, target.declarer, target.dbl, target.result, b.vul);
+      target.status = target.score !== null ? 'pending' : 'draft';
+      saveAndRefresh();
+    }
+
+    function getTargetScoring(idx) {
+      if (!db.currentMatch || !db.matches[db.currentMatch]) return null;
+      return db.matches[db.currentMatch].scores[currentTableKey][idx].scoring;
+    }
+
+    function confirmScore(idx) {
+      let t = getTargetScoring(idx);
+      if (t) t.status = 'confirmed';
+      saveAndRefresh();
+    }
+
+    function editScore(idx) {
+      let t = getTargetScoring(idx);
+      if (t) t.status = 'pending';
+      saveAndRefresh();
+    }
+
+    function handleHandRecordPhoto(idx, event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const b = db.matches[db.currentMatch].scores[currentTableKey][idx];
+        b.handRecordPhoto = { name: file.name, dataUrl: e.target.result };
+        saveAndRefresh();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleTravelerPhoto(idx, event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const b = db.matches[db.currentMatch].scores[currentTableKey][idx];
+        b.travelerPhoto = { name: file.name, dataUrl: e.target.result };
+        saveAndRefresh();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function saveDB() {
+      try {
+        localStorage.setItem("bridge_v49_db", JSON.stringify(db));
+      } catch (e) {
+        console.error("Storage limit or error", e);
+      }
+    }
+
+    function saveAndRefresh() {
+      saveDB();
+      refreshMatchDropdowns();
+      updateTableDropdown
