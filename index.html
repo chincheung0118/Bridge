@@ -221,4 +221,174 @@
   </main>
 
   <!-- Password Modal -->
-  <div id="passwordModal" class="fixed inset-0 bg-black/50 z
+  <div id="passwordModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-sm w-full p-4 space-y-3 shadow-xl">
+      <h3 class="font-bold text-sm text-slate-800">🔒 Tournament Director Password Required</h3>
+      <p class="text-xs text-slate-500">Please enter the TD password to access Admin & VP panel.</p>
+      <div>
+        <input type="password" id="adminPasswordInput" placeholder="Enter TD Password" autocomplete="current-password" class="w-full border rounded p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button onclick="closePasswordModal()" class="flex-1 bg-slate-200 text-slate-700 font-bold py-2 rounded text-xs">Cancel</button>
+        <button onclick="verifyAdminPassword()" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded text-xs">Login</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compass Seating Modal -->
+  <div id="seatingModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-sm text-slate-800" id="seatingModalTitle">🧭 Compass Seating Layout</h3>
+        <span id="seatingTableAffiliation" class="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">Table Affiliation</span>
+      </div>
+      <p class="text-[11px] text-slate-500">Enter player names below. Click suggestions from teammates to avoid typo errors.</p>
+      
+      <!-- Compass Diamond Grid Layout -->
+      <div class="relative bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col items-center gap-3">
+        <!-- North -->
+        <div class="w-48 text-center">
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">⬆️ North (<span id="labelTeamN">Team 1</span>)</label>
+          <input type="text" id="inputNorth" list="teammateList" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
+        </div>
+
+        <!-- West / East Row -->
+        <div class="flex justify-between w-full gap-4">
+          <div class="w-40 text-left">
+            <label class="block text-[11px] font-bold text-slate-700 mb-0.5">⬅️ West (<span id="labelTeamW">Opponent</span>)</label>
+            <input type="text" id="inputWest" list="teammateList" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
+          </div>
+          <div class="w-40 text-right">
+            <label class="block text-[11px] font-bold text-slate-700 mb-0.5">➡️ East (<span id="labelTeamE">Opponent</span>)</label>
+            <input type="text" id="inputEast" list="teammateList" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
+          </div>
+        </div>
+
+        <!-- South -->
+        <div class="w-48 text-center">
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">⬇️ South (<span id="labelTeamS">Team 1</span>)</label>
+          <input type="text" id="inputSouth" list="teammateList" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
+        </div>
+      </div>
+
+      <!-- Shared Autocomplete Datalist for Teammates -->
+      <datalist id="teammateList"></datalist>
+
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeSeatingModal()" class="flex-1 bg-slate-200 text-slate-700 font-bold py-2 rounded text-xs">Cancel</button>
+        <button onclick="saveSeatingModal()" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded text-xs">Save Seating</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Bulletproof DB Initialization & Migration Check
+    let db = JSON.parse(localStorage.getItem("bridge_v45_db") || "null");
+
+    if (!db || !db.matches || typeof db.matches !== 'object') {
+      db = {
+        matches: {
+          "Match 1": { 
+            status: "open", 
+            config: { totalTeams: 3, boardsCount: 2, movement: "RoundRobin" }, 
+            tables: {}, 
+            scores: {} 
+          }
+        },
+        currentMatch: "Match 1"
+      };
+    }
+
+    if (!db.currentMatch || !db.matches[db.currentMatch]) {
+      let openKeys = Object.keys(db.matches).filter(k => db.matches[k] && db.matches[k].status === 'open');
+      db.currentMatch = openKeys.length > 0 ? openKeys[0] : Object.keys(db.matches)[0] || "";
+    }
+
+    if (db.currentMatch && db.matches[db.currentMatch]) {
+      initMatchStructure(db.currentMatch);
+    }
+    saveDB();
+
+    let currentTableKey = "Table1";
+
+    const defaultVulSchedule = [
+      "None", "N-S", "E-W", "All",
+      "N-S", "E-W", "All", "None",
+      "E-W", "All", "None", "N-S",
+      "All", "None", "N-S", "E-W"
+    ];
+
+    const suits = ["♣", "♦", "♥", "♠", "NT"];
+
+    function getActiveTablesCount(totalTeams) {
+      return totalTeams;
+    }
+
+    function initMatchStructure(matchName) {
+      if (!db.matches[matchName]) return;
+      let m = db.matches[matchName];
+      if (!m.config) m.config = { totalTeams: 3, boardsCount: 2, movement: "RoundRobin" };
+      if (!m.tables) m.tables = {};
+      if (!m.scores) m.scores = {};
+      
+      let tCount = getActiveTablesCount(m.config.totalTeams);
+      for (let i = 1; i <= tCount; i++) {
+        let tKey = `Table${i}`;
+        if (!m.tables[tKey]) {
+          m.tables[tKey] = { N: ``, S: ``, E: ``, W: `` };
+        }
+        if (!m.scores[tKey] || m.scores[tKey].length !== m.config.boardsCount) {
+          m.scores[tKey] = generateBoardsArray(m.config.boardsCount, i);
+        }
+      }
+    }
+
+    function generateBoardsArray(boardsCount, tableIndex) {
+      let startBoard = ((tableIndex - 1) * boardsCount) + 1;
+      return Array.from({ length: boardsCount }, (_, idx) => {
+        let bNum = startBoard + idx;
+        return {
+          boardNum: bNum,
+          vul: defaultVulSchedule[(bNum - 1) % 16],
+          handRecordPhoto: null,
+          travelerPhoto: null,
+          scoring: { level: "", suit: "", declarer: "", dbl: "", result: "", score: null, status: "draft" }
+        };
+      });
+    }
+
+    function refreshMatchDropdowns() {
+      const select = document.getElementById('matchDropdownSelect');
+      if (!select) return;
+      select.innerHTML = '<option value="">-- Select Open Match --</option>';
+      for (let mName in db.matches) {
+        let m = db.matches[mName];
+        if (m && m.status === 'open') {
+          let opt = document.createElement('option');
+          opt.value = mName;
+          opt.innerText = mName + " (Open)";
+          if (mName === db.currentMatch) opt.selected = true;
+          select.appendChild(opt);
+        }
+      }
+    }
+
+    function joinSelectedMatch() {
+      const select = document.getElementById('matchDropdownSelect');
+      const val = select.value;
+      if (!val) return alert("Please select an open match!");
+      db.currentMatch = val;
+      initMatchStructure(db.currentMatch);
+      currentTableKey = "Table1";
+      updateTableDropdown();
+      saveAndRefresh();
+    }
+
+    function createMatchByAdmin() {
+      const nameInput = document.getElementById('newMatchNameInput');
+      const name = nameInput.value.trim();
+      const teams = parseInt(document.getElementById('newMatchTeams').value);
+      const boards = parseInt(document.getElementById('newMatchBoards').value);
+      const movement = document.getElementById('newMatchMovement').value;
+
+      if
