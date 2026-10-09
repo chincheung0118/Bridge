@@ -30,7 +30,7 @@
     </div>
   </header>
 
-  <!-- Global Roster Header Banner (Synced across all tables) -->
+  <!-- Global Roster Header Banner -->
   <div id="globalRosterBanner" class="bg-slate-800 text-slate-200 text-xs py-2 px-4 shadow-inner">
     <div class="max-w-xl mx-auto flex flex-col gap-1" id="rosterBannerContent">
       <span>Room not connected</span>
@@ -52,7 +52,7 @@
           <div>
             <label class="block font-semibold text-slate-600 mb-1">Select Active Table:</label>
             <select id="roomTypeSelect" onchange="switchRoomType(this.value)" class="w-full border rounded p-2 bg-slate-50 font-bold">
-              <!-- Dynamically populated based on total teams -->
+              <!-- Dynamically populated -->
             </select>
           </div>
           <div>
@@ -64,7 +64,7 @@
 
       <!-- Match Summary Card -->
       <div class="bg-slate-900 text-white rounded-xl p-4 shadow-md">
-        <div class="text-xs text-slate-400 mb-1 font-semibold uppercase tracking-wider">Match Score (IMPs)</div>
+        <div class="text-xs text-slate-400 mb-1 font-semibold uppercase tracking-wider">Match Score (Raw Points)</div>
         <div class="flex justify-between items-center text-center">
           <div class="flex-1">
             <div class="text-xs text-slate-400" id="teamANameLabel">Table N/S</div>
@@ -99,12 +99,12 @@
           <div>
             <label class="block font-semibold text-slate-600 mb-1">Total Teams in Event (2-8):</label>
             <select id="adminTotalTeams" onchange="updateAdminConfig()" class="w-full border rounded p-2 bg-slate-50 font-bold">
-              <option value="2">2 Teams (2 Tables: Open/Closed)</option>
-              <option value="3">3 Teams (3 Tables Simultaneous)</option>
-              <option value="4">4 Teams (4 Tables Simultaneous)</option>
-              <option value="5">5 Teams (Multi-Table + Bye)</option>
-              <option value="6">6 Teams (3 Tables Simultaneous)</option>
-              <option value="8">8 Teams (4 Tables Simultaneous)</option>
+              <option value="2">2 Teams (2 Tables)</option>
+              <option value="3">3 Teams (2 Tables + Bye)</option>
+              <option value="4">4 Teams (2 Tables)</option>
+              <option value="5">5 Teams (3 Tables + Bye)</option>
+              <option value="6">6 Teams (3 Tables)</option>
+              <option value="8">8 Teams (4 Tables)</option>
             </select>
           </div>
           <div>
@@ -184,7 +184,7 @@
 
   <script>
     let currentRoom = "DEFAULT";
-    let currentTableKey = "Table1"; // Active table key
+    let currentTableKey = "Table1";
 
     const defaultVulSchedule = [
       "None", "N-S", "E-W", "All",
@@ -195,11 +195,11 @@
 
     const suits = ["♣", "♦", "♥", "♠", "NT"];
 
-    let globalState = JSON.parse(localStorage.getItem("bridge_v22_data") || "{}");
+    let globalState = JSON.parse(localStorage.getItem("bridge_v23_data") || "{}");
 
     function getActiveTablesCount(totalTeams) {
-      if (totalTeams === 2) return 2; // Open / Closed
-      return Math.floor(totalTeams / 2); // e.g. 3 or 4 teams -> 2 tables; 5 or 6 teams -> 3 tables, etc.
+      if (totalTeams === 2) return 2;
+      return Math.ceil(totalTeams / 2);
     }
 
     function initRoom(room) {
@@ -225,7 +225,6 @@
           scores: initialScores
         };
       } else {
-        // Ensure tables match current config totalTeams
         let cfg = globalState[room].config;
         let tCount = getActiveTablesCount(cfg.totalTeams);
         for (let i = 1; i <= tCount; i++) {
@@ -301,11 +300,13 @@
       document.getElementById('inputSouth').value = t.S;
       document.getElementById('inputEast').value = t.E;
       document.getElementById('inputWest').value = t.W;
+      document.getElementById('seatingModal').classList.add('flex');
       document.getElementById('seatingModal').classList.remove('hidden');
     }
 
     function closeSeatingModal() {
       document.getElementById('seatingModal').classList.add('hidden');
+      document.getElementById('seatingModal').classList.remove('flex');
     }
 
     function saveSeatingModal() {
@@ -392,7 +393,7 @@
       let nextTable = tableNum < tablesNeeded ? tableNum + 1 : 1;
       let hasBye = cfg.totalTeams % 2 !== 0;
 
-      let movementInstruction = `Play Boards 1 to ${cfg.boardsCount} at <b>${currentTableKey}</b>. After round completion, <b>Move to Table No. ${nextTable}</b> or pass board set eastward.`;
+      let movementInstruction = `Play Boards 1 to ${cfg.boardsCount} at <b>${currentTableKey}</b>. After round completion, <b>Move to Table No. ${nextTable}</b> or pass board set accordingly.`;
       if (hasBye && cfg.totalTeams - tableNum * 2 < 0) {
         movementInstruction = `<b class="text-red-600">BYE ROUND:</b> This table is on standby / BYE for the current round. Rest at designated seating area.`;
       }
@@ -400,7 +401,7 @@
       container.innerHTML = `
         <div class="bg-slate-50 p-3 rounded-lg border space-y-2 text-xs">
           <div class="font-bold text-slate-700">System: <span class="text-blue-600">${cfg.movement}</span> (${cfg.totalTeams} Teams, ${tablesNeeded} Active Tables)</div>
-          <div class="text-slate-600">Match configuration: <b>${cfg.boardsCount} Boards</b> per round.</div>
+          <div class="text-slate-600">Match configuration: <b>${cfg.boardsCount} Boards</b> per round (Boards 1 - ${cfg.boardsCount}).</div>
           
           <div class="border-t pt-2 space-y-1">
             <div class="font-bold text-slate-800">📍 Current Location: <span class="text-purple-600">${currentTableKey}</span></div>
@@ -550,7 +551,7 @@
     }
 
     function saveAndRefresh() {
-      localStorage.setItem("bridge_v22_data", JSON.stringify(globalState));
+      localStorage.setItem("bridge_v23_data", JSON.stringify(globalState));
       renderAll();
     }
 
@@ -558,7 +559,6 @@
       initRoom(currentRoom);
       const roomData = globalState[currentRoom];
       
-      // Render global roster banner across all active tables
       let bannerHTML = '';
       for (let tKey in roomData.tables) {
         let t = roomData.tables[tKey];
@@ -707,7 +707,7 @@
       document.getElementById('teamANameLabel').innerText = `${currentTableKey} N/S`;
       document.getElementById('teamBNameLabel').innerText = `${currentTableKey} E/W`;
       document.getElementById('teamAScore').innerText = totalTableScore;
-      document.getElementById('teamBScore').innerText = 0; // Relative score placeholder for table
+      document.getElementById('teamBScore').innerText = 0;
     }
 
     initRoom(currentRoom);
