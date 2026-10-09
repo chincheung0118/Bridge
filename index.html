@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bridge Team Match IMP Calculator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .vul-active { background-color: #ef4444 !important; color: #ffffff !important; font-weight: bold; }
+    select:disabled { background-color: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen pb-12 text-slate-800">
+
+  <header class="bg-slate-900 text-white p-4 sticky top-0 z-50 shadow-md">
+    <div class="max-w-xl mx-auto flex justify-between items-center">
+      <h1 class="font-bold text-lg flex items-center gap-2"><span>♠️♥️</span> Bridge IMP App</h1>
+      <span class="text-xs bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-full text-slate-300" id="roomStatus">Room: Not Connected</span>
+    </div>
+  </header>
+
+  <main class="max-w-xl mx-auto p-4 space-y-4">
+    <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+      <h2 class="font-bold text-sm text-slate-600 mb-2">1. Room & Table Setup</h2>
+      <div class="flex gap-2 mb-3">
+        <input type="text" id="roomCodeInput" placeholder="Enter Room Code (e.g. 8888)" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button onclick="joinRoom()" class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Join</button>
+      </div>
+      <div class="flex gap-2 text-sm">
+        <label class="flex-1 bg-slate-50 border p-2.5 rounded-lg flex items-center justify-center gap-2 cursor-pointer">
+          <input type="radio" name="roomType" value="Open" checked onchange="switchRoomType('Open')" class="text-blue-600">
+          <span class="font-semibold">Open Room</span>
+        </label>
+        <label class="flex-1 bg-slate-50 border p-2.5 rounded-lg flex items-center justify-center gap-2 cursor-pointer">
+          <input type="radio" name="roomType" value="Closed" onchange="switchRoomType('Closed')" class="text-blue-600">
+          <span class="font-semibold">Closed Room</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="bg-slate-900 text-white rounded-xl p-4 shadow-md">
+      <div class="text-xs text-slate-400 mb-1 font-semibold uppercase tracking-wider">Match Result (Total IMPs)</div>
+      <div class="flex justify-between items-center text-center">
+        <div class="flex-1">
+          <div class="text-xs text-slate-400">Team A (N/S)</div>
+          <div class="text-3xl font-black text-blue-400" id="teamAScore">0</div>
+        </div>
+        <div class="px-4 text-slate-500 font-bold text-lg">VS</div>
+        <div class="flex-1">
+          <div class="text-xs text-slate-400">Team B (E/W)</div>
+          <div class="text-3xl font-black text-red-400" id="teamBScore">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-3" id="boardsList"></div>
+  </main>
+
+  <script>
+    let currentRoom = "DEFAULT";
+    let currentRoomType = "Open";
+
+    const vulSchedule = [
+      "None", "N-S", "E-W", "All",
+      "N-S", "E-W", "All", "None",
+      "E-W", "All", "None", "N-S",
+      "All", "None", "N-S", "E-W"
+    ];
+
+    let boardsData = JSON.parse(localStorage.getItem("bridge_v7_data") || "{}");
+
+    function initData(room) {
+      if (!boardsData[room]) {
+        boardsData[room] = Array.from({ length: 16 }, (_, i) => ({
+          boardNum: i + 1,
+          vul: vulSchedule[i],
+          open: { level: "", suit: "", declarer: "", dbl: "", result: "", score: null, status: "draft" },
+          closed: { level: "", suit: "", declarer: "", dbl: "", result: "", score: null, status: "draft" }
+        }));
+      }
+    }
+
+    function joinRoom() {
+      const code = document.getElementById('roomCodeInput').value.trim();
+      if (!code) return alert("Please enter a room code!");
+      currentRoom = code;
+      document.getElementById('roomStatus').innerText = `Room: ${currentRoom}`;
+      initData(currentRoom);
+      renderBoards();
+    }
+
+    function switchRoomType(type) {
+      currentRoomType = type;
+      renderBoards();
+    }
+
+    function calculateRawScore(level, suit, declarer, dbl, resultStr, vul) {
+      if (!level || !suit || !declarer || dbl === "" || resultStr === "") return null;
+
+      const l = parseInt(level);
+      const res = parseInt(resultStr);
+      const isVul = (vul === 'All') || 
+                    (vul === 'N-S' && (declarer === 'N' || declarer === 'S')) || 
+                    (vul === 'E-W' && (declarer === 'E' || declarer === 'W'));
+
+      const isDbl = dbl === 'X';
+      const isRedbl = dbl === 'XX';
+
+      if (res < 0) {
+        const undertricks = Math.abs(res);
+        let penalty = 0;
+        if (!isDbl && !isRedbl) {
+          penalty = undertricks * (isVul ? 100 : 50);
+        } else if (isDbl) {
+          if (!isVul) {
+            if (undertricks >= 1) penalty += 100;
+            if (undertricks >= 2) penalty += 200;
+            if (undertricks >= 3) penalty += 200;
+            if (undertricks > 3) penalty += (undertricks - 3) * 300;
+          } else {
+            if (undertricks >= 1) penalty += 200;
+            if (undertricks > 1) penalty += (undertricks - 1) * 300;
+          }
+        } else if (isRedbl) {
+          if (!isVul) {
+            if (undertricks >= 1) penalty += 200;
+            if (undertricks >= 2) penalty += 400;
+            if (undertricks >= 3) penalty += 400;
+            if (undertricks > 3) penalty += (undertricks - 3) * 600;
+          } else {
+            if (undertricks >= 1) penalty += 400;
+            if (undertricks > 1) penalty += (undertricks - 1) * 600;
+          }
+        }
+        let finalPenalty = -penalty;
+        if (declarer === 'E' || declarer === 'W') finalPenalty = -finalPenalty;
+        return finalPenalty;
+      }
+
+      let trickPts = 0;
+      if (suit === '♣' || suit === '♦') trickPts = l * 20;
+      else if (suit === '♠' || suit === '♥') trickPts = l * 30;
+      else if (suit === 'NT') trickPts = 40 + (l - 1) * 30;
+
+      if (isDbl) trickPts *= 2;
+      if (isRedbl) trickPts *= 4;
+
+      let score = trickPts;
+
+      if (trickPts >= 100) {
+        score += isVul ? 500 : 300;
+      } else {
+        score += 50;
+      }
+
+      if (l === 6) score += isVul ? 750 : 500;
+      if (l === 7) score += isVul ? 1500 : 1000;
+
+      if (isDbl) score += 50;
+      if (isRedbl) score += 100;
+
+      if (res > 0) {
+        if (!isDbl && !isRedbl) {
+          score += res * ((suit === '♣' || suit === '♦') ? 20 : 30);
+        } else if (isDbl) {
+          score += res * (isVul ? 200 : 100);
+        } else if (isRedbl) {
+          score += res * (isVul ? 400 : 200);
+        }
+      }
+
+      if (declarer === 'E' || declarer === 'W') score = -score;
+      return score;
+    }
+
+    function calculateIMP(diff) {
+      const abs = Math.abs(diff);
+      const scale = [20, 50, 90, 140, 170, 220, 260, 310, 360, 425, 490, 590, 740, 890, 1090, 1290, 1490, 1740, 1990, 2240, 2490, 2990, 3490, 3990];
+      let imp = 0;
+      for (let i = 0; i < scale.length; i++) {
+        if (abs >= scale[i]) imp = i + 1;
+        else break;
+      }
+      return diff >= 0 ? imp : -imp;
+    }
+
+    function updateScoreInput(idx, roomKey, changedStep) {
+      const b = boardsData[currentRoom][idx];
+      const target = roomKey === 'open' ? b.open : b.closed;
+
+      target.level = document.getElementById(`${roomKey}-level-${idx}`).value;
+
+      if (changedStep <= 1 && !target.level) {
+        target.suit = ""; target.declarer = ""; target.dbl = ""; target.result = "";
+      } else {
+        target.suit = document.getElementById(`${roomKey}-suit-${idx}`).value;
+      }
+
+      if (changedStep <= 2 && !target.suit) {
+        target.declarer = ""; target.dbl = ""; target.result = "";
+      } else {
+        target.declarer = document.getElementById(`${roomKey}-declarer-${idx}`).value;
+      }
+
+      if (changedStep <= 3 && !target.declarer) {
+        target.dbl = ""; target.result = "";
+      } else {
+        target.dbl = document.getElementById(`${roomKey}-dbl-${idx}`).value;
+      }
+
+      if (changedStep <= 4 && target.dbl === "") {
+        target.result = "";
+      } else {
+        updateResultDropdown(idx, roomKey, target.level, target.result);
+        target.result = document.getElementById(`${roomKey}-result-${idx}`).value;
+      }
+
+      target.score = calculateRawScore(target.level, target.suit, target.declarer, target.dbl, target.result, b.vul);
+      target.status = target.score !== null ? 'pending' : 'draft';
+
+      saveAndRefresh();
+    }
+
+    function updateResultDropdown(idx, roomKey, levelStr, selectedVal) {
+      const select = document.getElementById(`${roomKey}-result-${idx}`);
+      if (!select) return;
+
+      let html = '<option value="">5. Result</option><option value="0" ' + (selectedVal === "0" ? 'selected' : '') + '>=</option>';
+
+      if (levelStr) {
+        const level = parseInt(levelStr);
+        const maxOver = 7 - level;
+        for (let i = 1; i <= maxOver; i++) {
+          html += `<option value="${i}" ${selectedVal == i ? 'selected' : ''}>+${i}</option>`;
+        }
+        const maxUnder = level + 6;
+        for (let i = 1; i <= maxUnder; i++) {
+          html += `<option value="-${i}" ${selectedVal == -i ? 'selected' : ''}>-${i}</option>`;
+        }
+      }
+
+      select.innerHTML = html;
+    }
+
+    function confirmScore(idx, roomKey) {
+      const b = boardsData[currentRoom][idx];
+      const target = roomKey === 'open' ? b.open : b.closed;
+      target.status = 'confirmed';
+      saveAndRefresh();
+    }
+
+    function editScore(idx, roomKey) {
+      const b = boardsData[currentRoom][idx];
+      const target = roomKey === 'open' ? b.open : b.closed;
+      target.status = 'pending';
+      saveAndRefresh();
+    }
+
+    function saveAndRefresh() {
+      localStorage.setItem("bridge_v7_data", JSON.stringify(boardsData));
+      renderBoards();
+    }
+
+    function renderBoards() {
+      initData(currentRoom);
+      const container = document.getElementById('boardsList');
+      container.innerHTML = '';
+
+      let totalA = 0;
+      let totalB = 0;
+
+      boardsData[currentRoom].forEach((b, idx) => {
+        const isCurrentOpen = currentRoomType === 'Open';
+        const myData = isCurrentOpen ? b.open : b.closed;
+        const oppData = isCurrentOpen ? b.closed : b.open;
+        const myRoomKey = isCurrentOpen ? 'open' : 'closed';
+
+        const vulN = b.vul === 'All' || b.vul === 'N-S';
+        const vulS = b.vul === 'All' || b.vul === 'N-S';
+        const vulE = b.vul === 'All' || b.vul === 'E-W';
+        const vulW = b.vul === 'All' || b.vul === 'E-W';
+
+        let impText = '🔒 Hidden';
+        if (b.open.status === 'confirmed' && b.closed.status === 'confirmed') {
+          const diff = b.open.score - b.closed.score;
+          const imp = calculateIMP(diff);
+          if (imp > 0) { totalA += imp; impText = `+${imp} IMP (Team A)`; }
+          else if (imp < 0) { totalB += Math.abs(imp); impText = `+${Math.abs(imp)} IMP (Team B)`; }
+          else impText = '0 IMP';
+        }
+
+        const isLocked = myData.status === 'confirmed';
+
+        const step1Done = !!myData.level;
+        const step2Done = step1Done && !!myData.suit;
+        const step3Done = step2Done && !!myData.declarer;
+        const step4Done = step3Done && myData.dbl !== "";
+
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-3";
+        card.innerHTML = `
+          <div class="flex justify-between items-center border-b pb-2">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-base text-slate-800">Board ${b.boardNum}</span>
+              <span class="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600">Vul: ${b.vul}</span>
+            </div>
+            
+            <div class="flex text-xs font-semibold rounded overflow-hidden border">
+              <span class="px-1.5 py-0.5 ${vulN ? 'vul-active' : 'bg-slate-50 text-slate-400'}">N</span>
+              <span class="px-1.5 py-0.5 ${vulS ? 'vul-active' : 'bg-slate-50 text-slate-400'}">S</span>
+              <span class="px-1.5 py-0.5 ${vulE ? 'vul-active' : 'bg-slate-50 text-slate-400'}">E</span>
+              <span class="px-1.5 py-0.5 ${vulW ? 'vul-active' : 'bg-slate-50 text-slate-400'}">W</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-5 gap-1 text-xs">
+            <select id="${myRoomKey}-level-${idx}" ${isLocked ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 1)" class="border rounded p-1 bg-slate-50">
+              <option value="">1. Lvl</option>
+              ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${myData.level == n ? 'selected' : ''}>${n}</option>`).join('')}
+            </select>
+
+            <select id="${myRoomKey}-suit-${idx}" ${isLocked || !step1Done ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 2)" class="border rounded p-1 bg-slate-50 font-bold">
+              <option value="">2. Suit</option>
+              <option value="♠" ${myData.suit === '♠' ? 'selected' : ''}>♠</option>
+              <option value="♥" ${myData.suit === '♥' ? 'selected' : ''}>♥</option>
+              <option value="♦" ${myData.suit === '♦' ? 'selected' : ''}>♦</option>
+              <option value="♣" ${myData.suit === '♣' ? 'selected' : ''}>♣</option>
+              <option value="NT" ${myData.suit === 'NT' ? 'selected' : ''}>NT</option>
+            </select>
+
+            <select id="${myRoomKey}-declarer-${idx}" ${isLocked || !step2Done ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 3)" class="border rounded p-1 bg-slate-50">
+              <option value="">3. By</option>
+              ${['N','S','E','W'].map(d => `<option value="${d}" ${myData.declarer === d ? 'selected' : ''}>${d}</option>`).join('')}
+            </select>
+
+            <select id="${myRoomKey}-dbl-${idx}" ${isLocked || !step3Done ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 4)" class="border rounded p-1 bg-slate-50 font-semibold text-red-600">
+              <option value="">4. Dbl?</option>
+              <option value="NONE" ${myData.dbl === 'NONE' ? 'selected' : ''}>No (---)</option>
+              <option value="X" ${myData.dbl === 'X' ? 'selected' : ''}>X</option>
+              <option value="XX" ${myData.dbl === 'XX' ? 'selected' : ''}>XX</option>
+            </select>
+
+            <select id="${myRoomKey}-result-${idx}" ${isLocked || !step4Done ? 'disabled' : ''} onchange="updateScoreInput(${idx}, '${myRoomKey}', 5)" class="border rounded p-1 bg-slate-50">
+            </select>
+          </div>
+
+          <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs">
+            <div>
+              Score: <span class="font-bold text-slate-800">${myData.score !== null ? (myData.score > 0 ? '+' + myData.score : myData.score) : '-'}</span>
+            </div>
+            <div>
+              ${myData.status === 'pending' ? `
+                <button onclick="confirmScore(${idx}, '${myRoomKey}')" class="bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1 rounded text-xs">
+                  ✅ Confirm
+                </button>
+              ` : myData.status === 'confirmed' ? `
+                <button onclick="editScore(${idx}, '${myRoomKey}')" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2.5 py-1 rounded text-xs border border-slate-300 flex items-center gap-1">
+                  ✏️ Edit / Correct
+                </button>
+              ` : ''}
+            </div>
+          </div>
+
+          <div class="text-xs text-slate-500 flex justify-between items-center border-t pt-2">
+            <span>Other Table: ${b.open.status === 'confirmed' && b.closed.status === 'confirmed' ? oppData.score : '🔒 Hidden'}</span>
+            <span class="font-bold text-blue-600">${impText}</span>
+          </div>
+        `;
+        container.appendChild(card);
+        updateResultDropdown(idx, myRoomKey, myData.level, myData.result);
+      });
+
+      document.getElementById('teamAScore').innerText = totalA;
+      document.getElementById('teamBScore').innerText = totalB;
+    }
+
+    initData(currentRoom);
+    renderBoards();
+  </script>
+</body>
+</html>
