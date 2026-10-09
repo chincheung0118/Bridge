@@ -195,7 +195,7 @@
 
     const suits = ["♣", "♦", "♥", "♠", "NT"];
 
-    let globalState = JSON.parse(localStorage.getItem("bridge_v23_data") || "{}");
+    let globalState = JSON.parse(localStorage.getItem("bridge_v24_data") || "{}");
 
     function getActiveTablesCount(totalTeams) {
       if (totalTeams === 2) return 2;
@@ -205,13 +205,14 @@
     function initRoom(room) {
       if (!globalState[room]) {
         let totalTeams = 4;
+        let boardsCount = 16;
         let tablesCount = getActiveTablesCount(totalTeams);
         let initialTables = {};
         let initialScores = {};
 
         for (let i = 1; i <= tablesCount; i++) {
           initialTables[`Table${i}`] = { N: `N (Team ${i})`, S: `S (Team ${i})`, E: `E (Team ${i+1})`, W: `W (Team ${i+1})` };
-          initialScores[`Table${i}`] = Array.from({ length: 16 }, (_, idx) => ({
+          initialScores[`Table${i}`] = Array.from({ length: boardsCount }, (_, idx) => ({
             boardNum: idx + 1,
             vul: defaultVulSchedule[idx % 16],
             uploadedPhoto: null,
@@ -220,7 +221,7 @@
         }
 
         globalState[room] = {
-          config: { totalTeams: totalTeams, boardsCount: 16, movement: "RoundRobin" },
+          config: { totalTeams: totalTeams, boardsCount: boardsCount, movement: "RoundRobin" },
           tables: initialTables,
           scores: initialScores
         };
@@ -232,7 +233,8 @@
           if (!globalState[room].tables[tKey]) {
             globalState[room].tables[tKey] = { N: `N`, S: `S`, E: `E`, W: `W` };
           }
-          if (!globalState[room].scores[tKey]) {
+          // Ensure board array length strictly matches cfg.boardsCount
+          if (!globalState[room].scores[tKey] || globalState[room].scores[tKey].length !== cfg.boardsCount) {
             globalState[room].scores[tKey] = Array.from({ length: cfg.boardsCount }, (_, idx) => ({
               boardNum: idx + 1,
               vul: defaultVulSchedule[idx % 16],
@@ -337,6 +339,7 @@
         if (!globalState[currentRoom].tables[tKey]) {
           globalState[currentRoom].tables[tKey] = { N: `N`, S: `S`, E: `E`, W: `W` };
         }
+        // Re-initialize scores array with exact new boards count
         globalState[currentRoom].scores[tKey] = Array.from({ length: boards }, (_, idx) => ({
           boardNum: idx + 1,
           vul: defaultVulSchedule[idx % 16],
@@ -551,7 +554,7 @@
     }
 
     function saveAndRefresh() {
-      localStorage.setItem("bridge_v23_data", JSON.stringify(globalState));
+      localStorage.setItem("bridge_v24_data", JSON.stringify(globalState));
       renderAll();
     }
 
@@ -564,7 +567,7 @@
         let t = roomData.tables[tKey];
         bannerHTML += `<div class="flex justify-between items-center w-full font-bold"><span class="text-blue-400">${tKey}: N/S (${t.N}, ${t.S}) vs E/W (${t.E}, ${t.W})</span></div>`;
       }
-      document.getElementById('rosterBannerContent').innerHTML = bannerHTML;
+      document.getElementById('globalRosterBanner').innerHTML = `<div class="max-w-xl mx-auto flex flex-col gap-1">${bannerHTML}</div>`;
 
       const container = document.getElementById('boardsList');
       container.innerHTML = '';
