@@ -59,7 +59,7 @@
           </div>
         </div>
 
-        <button onclick="joinSelectedMatch()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm shadow-sm">🚀 Step C: Join Match & Enter Players</button>
+        <button id="btnJoinMatch" onclick="joinSelectedMatch()" disabled class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-400">🚀 Step C: Join Match & Enter Players</button>
       </div>
 
       <div class="bg-slate-900 text-white rounded-xl p-4 shadow-md">
@@ -262,47 +262,28 @@
   </div>
 
   <script>
-    // Force reset to a clean v47 database state to clear any locked/closed match caches
-    let db = JSON.parse(localStorage.getItem("bridge_v47_db") || "null");
+    let db = JSON.parse(localStorage.getItem("bridge_v50_db") || "null");
 
-    if (!db || !db.matches || typeof db.matches !== 'object' || Object.keys(db.matches).length === 0) {
-      db = {
-        matches: {
-          "Match 1": { 
-            status: "open", 
-            config: { totalTeams: 3, boardsCount: 3, movement: "RoundRobin" }, 
-            tables: {}, 
-            scores: {} 
-          }
-        },
-        currentMatch: "Match 1"
-      };
+    if (!db || !db.matches || typeof db.matches !== 'object') {
+      db = { matches: {}, currentMatch: "" };
     }
 
-    // Ensure at least one match is always open
-    let hasOpenMatch = Object.keys(db.matches).some(k => db.matches[k] && db.matches[k].status === 'open');
-    if (!hasOpenMatch) {
-      let firstKey = Object.keys(db.matches)[0];
-      if (firstKey) {
-        db.matches[firstKey].status = 'open';
-      } else {
-        db.matches["Match 1"] = { 
-          status: "open", 
-          config: { totalTeams: 3, boardsCount: 3, movement: "RoundRobin" }, 
-          tables: {}, 
-          scores: {} 
-        };
-      }
+    if (!db.matches["Match 1"]) {
+      db.matches["Match 1"] = { 
+        status: "open", 
+        config: { totalTeams: 3, boardsCount: 3, movement: "RoundRobin" }, 
+        tables: {}, 
+        scores: {} 
+      };
+    } else {
+      db.matches["Match 1"].status = "open";
     }
 
     if (!db.currentMatch || !db.matches[db.currentMatch] || db.matches[db.currentMatch].status !== 'open') {
-      let openKeys = Object.keys(db.matches).filter(k => db.matches[k] && db.matches[k].status === 'open');
-      db.currentMatch = openKeys.length > 0 ? openKeys[0] : Object.keys(db.matches)[0];
+      db.currentMatch = "Match 1";
     }
 
-    if (db.currentMatch && db.matches[db.currentMatch]) {
-      initMatchStructure(db.currentMatch);
-    }
+    initMatchStructure(db.currentMatch);
     saveDB();
 
     let currentTableKey = "";
@@ -353,6 +334,19 @@
       });
     }
 
+    function updateJoinButtonState() {
+      const matchSelect = document.getElementById('matchDropdownSelect');
+      const tableSelect = document.getElementById('roomTypeSelect');
+      const joinBtn = document.getElementById('btnJoinMatch');
+      if (!joinBtn) return;
+
+      if (matchSelect.value && tableSelect.value) {
+        joinBtn.disabled = false;
+      } else {
+        joinBtn.disabled = true;
+      }
+    }
+
     function refreshMatchDropdowns() {
       const select = document.getElementById('matchDropdownSelect');
       if (!select) return;
@@ -368,6 +362,7 @@
         }
       }
       updateTableDropdownState();
+      updateJoinButtonState();
     }
 
     function onMatchDropdownChange() {
@@ -380,6 +375,7 @@
         tableSelect.innerHTML = '<option value="">-- Please Select Match First --</option>';
         tableSelect.disabled = true;
         tableSelect.className = "w-full border rounded-lg px-3 py-2 text-sm bg-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed";
+        updateJoinButtonState();
         saveDB();
         renderAll();
         return;
@@ -389,6 +385,7 @@
       initMatchStructure(db.currentMatch);
       currentTableKey = "";
       updateTableDropdownState();
+      updateJoinButtonState();
       saveDB();
       renderAll();
     }
@@ -402,6 +399,7 @@
         tableSelect.innerHTML = '<option value="">-- Please Select Match First --</option>';
         tableSelect.disabled = true;
         tableSelect.className = "w-full border rounded-lg px-3 py-2 text-sm bg-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed";
+        updateJoinButtonState();
         return;
       }
 
@@ -414,19 +412,21 @@
       for (let i = 1; i <= tCount; i++) {
         let tKey = `Table${i}`;
         let t = m.tables[tKey] || { N: '', S: '', E: '', W: '' };
-        let nsDesc = (t.N || t.S) ? `(${t.N || 'N'}/${t.S || 'S'})` : `(Team ${i})`;
+        let nsDesc = (t.N || t.S) ? `(${t.N \vert{}\vert{} 'N'}/${t.S || 'S'})` : `(Team ${i})`;
         let opt = document.createElement('option');
         opt.value = tKey;
-        opt.innerText = `Table ${i} ${nsDesc}`;
+        opt.innerText = `Table ${i}${nsDesc}`;
         if (tKey === currentTableKey) opt.selected = true;
         tableSelect.appendChild(opt);
       }
+      updateJoinButtonState();
     }
 
     function onTableDropdownChange() {
       const tableSelect = document.getElementById('roomTypeSelect');
       if (tableSelect && tableSelect.value) {
         currentTableKey = tableSelect.value;
+        updateJoinButtonState();
         saveDB();
         renderAll();
       }
@@ -436,8 +436,7 @@
       const matchSelect = document.getElementById('matchDropdownSelect');
       const tableSelect = document.getElementById('roomTypeSelect');
       
-      if (!matchSelect.value) return alert("Please select a match first (Step A)!");
-      if (!tableSelect.value) return alert("Please select an active table (Step B)!");
+      if (!matchSelect.value || !tableSelect.value) return;
 
       db.currentMatch = matchSelect.value;
       currentTableKey = tableSelect.value;
@@ -577,7 +576,7 @@
     }
 
     function openSeatingModal() {
-      if (!db.currentMatch || !currentTableKey) return alert("Please select both Match and Active Table first!");
+      if (!db.currentMatch || !currentTableKey) return;
       const m = db.matches[db.currentMatch];
       const t = m.tables[currentTableKey] || { N: '', S: '', E: '', W: '' };
       
@@ -586,7 +585,7 @@
       let ewTeam = `Opponent / Team ${(tableIndex % m.config.totalTeams) + 1}`;
 
       document.getElementById('seatingModalTitle').innerText = `🧭 Compass Seating for ${currentTableKey}`;
-      document.getElementById('seatingTableAffiliation').innerText = `${nsTeam} (NS) vs ${ewTeam} (EW)`;
+      document.getElementById('seatingTableAffiliation').innerText = `${nsTeam} (NS) vs${ewTeam} (EW)`;
       document.getElementById('labelTeamN').innerText = nsTeam;
       document.getElementById('labelTeamS').innerText = nsTeam;
       document.getElementById('labelTeamW').innerText = ewTeam;
@@ -663,13 +662,12 @@
       const totalTeams = cfg.totalTeams;
       const boardsPerRound = cfg.boardsCount;
       let tablesNeeded = getActiveTablesCount(totalTeams);
-      let totalBoardsNeeded = totalTeams * boardsPerRound;
 
       let placementHTML = "";
       for (let i = 1; i <= tablesNeeded; i++) {
         let startB = ((i - 1) * boardsPerRound) + 1;
         let endB = i * boardsPerRound;
-        placementHTML += `<div>• <b>Boards ${startB} - ${endB}</b> placed at <b>Table ${i}</b> (Team ${i} Station).</div>`;
+        placementHTML += `<div>• <b>Boards ${startB} -${endB}</b> placed at <b>Table ${i}</b> (Team${i} Station).</div>`;
       }
 
       let prepHTML = `
@@ -720,7 +718,7 @@
 
         standingsHTML += `
           <tr>
-            <td class="border p-2 font-bold">Team ${i} (Table ${i})</td>
+            <td class="border p-2 font-bold">Team ${i} (Table${i})</td>
             <td class="border p-2 text-blue-600 font-bold">${totalImp >= 0 ? '+' + totalImp : totalImp} IMPs</td>
             <td class="border p-2 text-purple-700 font-black">${vp} VP</td>
             <td class="border p-2 text-green-600 font-semibold">${m.status.toUpperCase()}</td>
@@ -786,7 +784,7 @@
             <div>• <b>West:</b> ${activeTable.W || '(Unassigned)'}</div>
           </div>
           <div class="border-t pt-2 text-[11px] text-amber-700 bg-amber-50 p-2 rounded">
-            👉 <b>Transition:</b> Play Boards ${startB}-${endB} at ${currentTableKey}, then move to Table ${nextTable}.
+            👉 <b>Transition:</b> Play Boards ${startB}-${endB} at ${currentTableKey}, then move to Table${nextTable}.
           </div>
         </div>
       `;
@@ -799,9 +797,6 @@
       const isVul = (vul === 'All') || 
                     (vul === 'N-S' && (declarer === 'N' || declarer === 'S')) || 
                     (vul === 'E-W' && (declarer === 'E' || declarer === 'W'));
-
-      const isDbl = dbl === 'X';
-      const isRedbl = db.matches[db.currentMatch]?.config?.movement ? (dbl === 'XX') : false;
 
       if (res < 0) {
         let penalty = Math.abs(res) * (dbl === 'X' ? (isVul ? 200 : 100) : (isVul ? 100 : 50));
@@ -903,7 +898,7 @@
     }
 
     function saveDB() {
-      localStorage.setItem("bridge_v47_db", JSON.stringify(db));
+      localStorage.setItem("bridge_v50_db", JSON.stringify(db));
     }
 
     function saveAndRefresh() {
@@ -929,13 +924,13 @@
       const m = db.matches[db.currentMatch];
       initMatchStructure(db.currentMatch);
 
-      let bannerHTML = `<div class="flex justify-between items-center w-full font-bold border-b border-slate-700 pb-1 mb-1"><span class="text-yellow-300">Active Match: ${db.currentMatch} | Table: ${currentTableKey}</span></div>`;
+      let bannerHTML = `<div class="flex justify-between items-center w-full font-bold border-b border-slate-700 pb-1 mb-1"><span class="text-yellow-300">Active Match: ${db.currentMatch} \vert{} Table:${currentTableKey}</span></div>`;
       
       for (let tKey in m.tables) {
         let t = m.tables[tKey];
-        let nsStr = (t.N || t.S) ? `${t.N || 'N'}, ${t.S || 'S'}` : 'N/S Unassigned';
-        let ewStr = (t.E || t.W) ? `${t.E || 'E'}, ${t.W || 'W'}` : 'E/W Unassigned';
-        bannerHTML += `<div class="flex justify-between items-center w-full text-[11px]"><span class="text-blue-300">📍 ${tKey}:</span> <span class="text-slate-100 font-semibold">[NS: ${nsStr}] vs [EW: ${ewStr}]</span></div>`;
+        let nsStr = (t.N || t.S) ? `${t.N \vert{}\vert{} 'N'},${t.S || 'S'}` : 'N/S Unassigned';
+        let ewStr = (t.E || t.W) ? `${t.E \vert{}\vert{} 'E'},${t.W || 'W'}` : 'E/W Unassigned';
+        bannerHTML += `<div class="flex justify-between items-center w-full text-[11px]"><span class="text-blue-300">📍 ${tKey}:</span> <span class="text-slate-100 font-semibold">[NS: ${nsStr}] vs [EW:${ewStr}]</span></div>`;
       }
       bannerEl.innerHTML = `<div class="max-w-xl mx-auto flex flex-col gap-0.5">${bannerHTML}</div>`;
 
@@ -1005,42 +1000,4 @@
         card.className = "bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-2";
         card.innerHTML = `
           <div class="flex justify-between items-center border-b pb-2">
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-base text-slate-800">Board ${b.boardNum}</span>
-              <span class="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600">Vul: ${b.vul}</span>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-2 text-xs pt-1">
-            <label class="bg-slate-800 text-white py-1 rounded cursor-pointer text-center font-bold">
-              ${b.handRecordPhoto ? '✅ Change Hand Rec' : 'Upload Hand Rec'}
-              <input type="file" accept="image/*" onchange="handleHandRecordPhoto(${idx}, event)" class="hidden">
-            </label>
-            <label class="bg-blue-600 text-white py-1 rounded cursor-pointer text-center font-bold">
-              ${b.travelerPhoto ? '✅ Change Traveler' : 'Upload Traveler'}
-              <input type="file" accept="image/*" onchange="handleTravelerPhoto(${idx}, event)" class="hidden">
-            </label>
-          </div>
-          <div><div class="text-[11px] font-bold text-slate-500 mb-1">Step 1: Select Contract:</div>${matrixHtml}</div>
-          ${declarerHtml} ${doubleHtml} ${resultHtml}
-          <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs mt-3">
-            <div>
-              <span class="font-bold text-slate-700">Contract:</span> 
-              <span class="font-bold text-blue-600">${myData.level ? myData.level + myData.suit : '-'}${myData.declarer ? ' by ' + myData.declarer : ''}</span>
-              <br><span class="font-bold text-slate-700">Score:</span> <span class="font-black text-slate-900">${myData.score !== null ? myData.score : '-'}</span>
-            </div>
-            <div>
-              ${myData.status === 'pending' ? `<button onclick="confirmScore(${idx})" class="bg-green-600 text-white font-bold px-3 py-1.5 rounded text-xs">✅ Confirm</button>` : myData.status === 'confirmed' ? `<button onclick="editScore(${idx})" class="bg-slate-200 text-slate-700 font-bold px-2.5 py-1 rounded text-xs">✏️ Edit</button>` : ''}
-            </div>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-
-      document.getElementById('matchSummaryTitle').innerText = `${currentTableKey} Cumulative Raw Score`;
-      document.getElementById('teamAScore').innerText = totalTableScore;
-    }
-
-    refreshMatchDropdowns();
-  </script>
-</body>
-</html>
+            <div class="flex
