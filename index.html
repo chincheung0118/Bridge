@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bridge Multi-Team Match Calculator & Movement</title>
+  <title>Bridge Master Director & Team Calculator</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -21,7 +21,7 @@
 
   <header class="bg-slate-900 text-white p-4 sticky top-0 z-50 shadow-md">
     <div class="max-w-xl mx-auto flex justify-between items-center">
-      <h1 class="font-bold text-base flex items-center gap-2"><span>♠️♥️</span> Multi-Team Bridge App</h1>
+      <h1 class="font-bold text-base flex items-center gap-2"><span>♠️♥️</span> Pro Bridge Director App</h1>
       <div class="flex items-center gap-2">
         <button onclick="switchView('scoring')" id="btnViewScoring" class="text-xs bg-blue-600 px-3 py-1 rounded font-bold">Scoring</button>
         <button onclick="switchView('movement')" id="btnViewMovement" class="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded font-bold">📋 Movement</button>
@@ -84,8 +84,8 @@
     <!-- ================= MOVEMENT & SUMMARY VIEW ================= -->
     <div id="viewMovement" class="space-y-4 hidden">
       <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-3">
-        <h2 class="font-bold text-base text-slate-800 border-b pb-2">📋 Multi-Table Movement & Board Guide</h2>
-        <p class="text-xs text-slate-500">Check this verification card with your opponents before starting the round.</p>
+        <h2 class="font-bold text-base text-slate-800 border-b pb-2">📋 Movement & Board Placement Guide</h2>
+        <p class="text-xs text-slate-500">Check this setup with your opponents before starting.</p>
         <div id="movementSummaryCard" class="space-y-3 pt-2"></div>
       </div>
     </div>
@@ -97,19 +97,19 @@
         
         <div class="grid grid-cols-2 gap-3 text-xs">
           <div>
-            <label class="block font-semibold text-slate-600 mb-1">Total Teams in Event (2-8):</label>
+            <label class="block font-semibold text-slate-600 mb-1">Total Teams in Event:</label>
             <select id="adminTotalTeams" onchange="updateAdminConfig()" class="w-full border rounded p-2 bg-slate-50 font-bold">
               <option value="2">2 Teams (2 Tables)</option>
-              <option value="3">3 Teams (2 Tables + Bye)</option>
-              <option value="4">4 Teams (2 Tables)</option>
-              <option value="5">5 Teams (3 Tables + Bye)</option>
-              <option value="6">6 Teams (3 Tables)</option>
-              <option value="8">8 Teams (4 Tables)</option>
+              <option value="3">3 Teams (3 Tables)</option>
+              <option value="4">4 Teams (4 Tables)</option>
+              <option value="5">5 Teams (5 Tables)</option>
+              <option value="6">6 Teams (6 Tables)</option>
+              <option value="8">8 Teams (8 Tables)</option>
             </select>
           </div>
           <div>
-            <label class="block font-semibold text-slate-600 mb-1">Boards per Match (2-24):</label>
-            <input type="number" id="adminBoardsCount" min="2" max="24" value="16" onchange="updateAdminConfig()" class="w-full border rounded p-2 bg-slate-50 font-bold">
+            <label class="block font-semibold text-slate-600 mb-1">Boards per Round/Match:</label>
+            <input type="number" id="adminBoardsCount" min="1" max="24" value="2" onchange="updateAdminConfig()" class="w-full border rounded p-2 bg-slate-50 font-bold">
           </div>
         </div>
 
@@ -117,28 +117,27 @@
         <div class="space-y-1.5 text-xs">
           <label class="block font-semibold text-slate-700">Select Board Movement / System:</label>
           <select id="adminMovementSelect" onchange="updateAdminConfig()" class="w-full border rounded p-2 bg-slate-50 font-bold">
-            <option value="RoundRobin">1. Multi-Table Round Robin</option>
+            <option value="RoundRobin">1. Multi-Table Round Robin (1 Team = 1 Table)</option>
             <option value="Mitchell">2. Mitchell Team Movement</option>
             <option value="Swiss">3. Swiss Teams Movement</option>
-            <option value="SharedBoards">4. Shared Boards / Round Royale</option>
           </select>
         </div>
 
         <!-- Calculated Equipment & Board Sets Prep Guide -->
-        <div id="materialPrepBox" class="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs space-y-1.5">
-          <div class="font-bold text-amber-900">📦 Actual Calculated Board Sets & Equipment Required:</div>
+        <div id="materialPrepBox" class="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs space-y-2">
+          <div class="font-bold text-amber-900">📦 TD Board Placement & Standby Guide:</div>
           <div id="materialPrepContent" class="text-amber-800 space-y-1"></div>
         </div>
 
-        <!-- Cross Table IMP Matrix & Leaderboard -->
+        <!-- Standings -->
         <div class="border-t pt-3 space-y-2">
-          <h3 class="font-bold text-xs text-slate-700">Cross-Team IMP Standings & Leaderboard</h3>
+          <h3 class="font-bold text-xs text-slate-700">Tournament Standings</h3>
           <div id="adminStandingsContainer" class="overflow-x-auto">
             <table class="w-full text-xs text-left border-collapse border border-slate-200">
               <thead>
                 <tr class="bg-slate-100 text-slate-700">
-                  <th class="border p-2">Team</th>
-                  <th class="border p-2">Total IMPs</th>
+                  <th class="border p-2">Team / Station</th>
+                  <th class="border p-2">Total Score</th>
                   <th class="border p-2">Status</th>
                 </tr>
               </thead>
@@ -195,29 +194,23 @@
 
     const suits = ["♣", "♦", "♥", "♠", "NT"];
 
-    let globalState = JSON.parse(localStorage.getItem("bridge_v24_data") || "{}");
+    let globalState = JSON.parse(localStorage.getItem("bridge_v26_data") || "{}");
 
     function getActiveTablesCount(totalTeams) {
-      if (totalTeams === 2) return 2;
-      return Math.ceil(totalTeams / 2);
+      return totalTeams; // 1 team = 1 table
     }
 
     function initRoom(room) {
       if (!globalState[room]) {
-        let totalTeams = 4;
-        let boardsCount = 16;
+        let totalTeams = 3;
+        let boardsCount = 2; // e.g. 2 boards per round
         let tablesCount = getActiveTablesCount(totalTeams);
         let initialTables = {};
         let initialScores = {};
 
         for (let i = 1; i <= tablesCount; i++) {
-          initialTables[`Table${i}`] = { N: `N (Team ${i})`, S: `S (Team ${i})`, E: `E (Team ${i+1})`, W: `W (Team ${i+1})` };
-          initialScores[`Table${i}`] = Array.from({ length: boardsCount }, (_, idx) => ({
-            boardNum: idx + 1,
-            vul: defaultVulSchedule[idx % 16],
-            uploadedPhoto: null,
-            scoring: { level: "", suit: "", declarer: "", dbl: "", result: "", score: null, status: "draft" }
-          }));
+          initialTables[`Table${i}`] = { N: `N (Team ${i})`, S: `S (Team ${i})`, E: `E (Opponent)`, W: `W (Opponent)` };
+          initialScores[`Table${i}`] = generateBoardsArray(boardsCount, i);
         }
 
         globalState[room] = {
@@ -233,17 +226,26 @@
           if (!globalState[room].tables[tKey]) {
             globalState[room].tables[tKey] = { N: `N`, S: `S`, E: `E`, W: `W` };
           }
-          // Ensure board array length strictly matches cfg.boardsCount
           if (!globalState[room].scores[tKey] || globalState[room].scores[tKey].length !== cfg.boardsCount) {
-            globalState[room].scores[tKey] = Array.from({ length: cfg.boardsCount }, (_, idx) => ({
-              boardNum: idx + 1,
-              vul: defaultVulSchedule[idx % 16],
-              uploadedPhoto: null,
-              scoring: { level: "", suit: "", declarer: "", dbl: "", result: "", score: null, status: "draft" }
-            }));
+            globalState[room].scores[tKey] = generateBoardsArray(cfg.boardsCount, i);
           }
         }
       }
+    }
+
+    function generateBoardsArray(boardsCount, tableIndex) {
+      // Correctly compute board number sequence based on table index and boards per round
+      // e.g. Table 1 gets boards 1 to 2, Table 2 gets 3 to 4, etc.
+      let startBoard = ((tableIndex - 1) * boardsCount) + 1;
+      return Array.from({ length: boardsCount }, (_, idx) => {
+        let bNum = startBoard + idx;
+        return {
+          boardNum: bNum,
+          vul: defaultVulSchedule[(bNum - 1) % 16],
+          uploadedPhoto: null,
+          scoring: { level: "", suit: "", declarer: "", dbl: "", result: "", score: null, status: "draft" }
+        };
+      });
     }
 
     function joinRoom() {
@@ -265,7 +267,7 @@
         let tKey = `Table${i}`;
         let opt = document.createElement('option');
         opt.value = tKey;
-        opt.innerText = `Table ${i} (${roomData.config.totalTeams} Teams Event)`;
+        opt.innerText = `Table ${i} (Team ${i} Station)`;
         if (tKey === currentTableKey) opt.selected = true;
         select.appendChild(opt);
       }
@@ -273,7 +275,7 @@
 
     function switchView(view) {
       ['viewScoring', 'viewMovement', 'viewAdmin'].forEach(v => document.getElementById(v).classList.add('hidden'));
-      ['btnViewScoring', 'btnViewMovement', 'btnViewAdmin'].forEach(b => document.getElementById(b).className = "text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded font-bold");
+      ['btnViewScoring', 'btnViewMovement', 'btnViewAdmin'].forEach(b => b.className = "text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded font-bold");
 
       if (view === 'scoring') {
         document.getElementById('viewScoring').classList.remove('hidden');
@@ -337,15 +339,9 @@
       for (let i = 1; i <= tCount; i++) {
         let tKey = `Table${i}`;
         if (!globalState[currentRoom].tables[tKey]) {
-          globalState[currentRoom].tables[tKey] = { N: `N`, S: `S`, E: `E`, W: `W` };
+          globalState[currentRoom].tables[tKey] = { N: `N (Team ${i})`, S: `S (Team ${i})`, E: `E`, W: `W` };
         }
-        // Re-initialize scores array with exact new boards count
-        globalState[currentRoom].scores[tKey] = Array.from({ length: boards }, (_, idx) => ({
-          boardNum: idx + 1,
-          vul: defaultVulSchedule[idx % 16],
-          uploadedPhoto: null,
-          scoring: { level: "", suit: "", declarer: "", dbl: "", result: "", score: null, status: "draft" }
-        }));
+        globalState[currentRoom].scores[tKey] = generateBoardsArray(boards, i);
       }
 
       updateTableDropdown();
@@ -360,26 +356,38 @@
       document.getElementById('adminMovementSelect').value = cfg.movement;
 
       const totalTeams = cfg.totalTeams;
-      const boardsCount = cfg.boardsCount;
+      const boardsPerRound = cfg.boardsCount;
       let tablesNeeded = getActiveTablesCount(totalTeams);
-      let boardSetsNeeded = tablesNeeded;
+      let totalBoardsNeeded = totalTeams * boardsPerRound;
+
+      let placementHTML = "";
+      for (let i = 1; i <= tablesNeeded; i++) {
+        let startB = ((i - 1) * boardsPerRound) + 1;
+        let endB = i * boardsPerRound;
+        placementHTML += `<div>• <b>Boards ${startB} - ${endB}</b> placed at <b>Table ${i}</b> (Team ${i} Station).</div>`;
+      }
+
       let hasBye = totalTeams % 2 !== 0;
-      let byeTableMsg = hasBye ? `<b class="text-red-600">YES</b> (Team ${totalTeams} has a BYE; standby between Table ${tablesNeeded} and scoring desk).` : `None (Even number of teams).`;
+      let standbyMsg = hasBye 
+        ? `<div class="text-red-700 font-bold">• Standby / BYE: Team ${totalTeams} is resting/standby between Table ${tablesNeeded} and scoring desk.</div>` 
+        : `<div>• Standby / BYE: None (Even number of teams).</div>`;
 
       let prepHTML = `
-        <div>• <b>Board Number Range:</b> Prepare boards numbered <b>1 to ${boardsCount}</b> per table set.</div>
-        <div>• <b>Active Tables Simultaneous:</b> <b>${tablesNeeded} Tables</b> operating concurrently for ${totalTeams} Teams.</div>
-        <div>• <b>Board Sets Required:</b> ${boardSetsNeeded} complete set(s) of boards 1-${boardsCount}.</div>
-        <div>• <b>BYE / Standby Status:</b> ${byeTableMsg}</div>
+        <div>• <b>Total Teams / Tables:</b> ${totalTeams} Teams (${tablesNeeded} Tables active).</div>
+        <div>• <b>Boards per Round:</b> ${boardsPerRound} boards per table.</div>
+        <div>• <b>Total Board Sets Needed:</b> ${totalBoardsNeeded} boards in total.</div>
+        <div class="border-t border-amber-200 pt-1 mt-1 font-bold text-amber-900">Exact Board Placement:</div>
+        ${placementHTML}
+        ${standbyMsg}
       `;
       document.getElementById('materialPrepContent').innerHTML = prepHTML;
 
       const tbody = document.getElementById('adminTableBody');
       tbody.innerHTML = `
         <tr>
-          <td class="border p-2 font-bold">All Teams</td>
-          <td class="border p-2 text-blue-600 font-bold">0 IMPs / Board Points</td>
-          <td class="border p-2 text-green-600 font-semibold">Active Round</td>
+          <td class="border p-2 font-bold">All ${totalTeams} Teams</td>
+          <td class="border p-2 text-blue-600 font-bold">Active</td>
+          <td class="border p-2 text-green-600 font-semibold">Running</td>
         </tr>
       `;
     }
@@ -394,17 +402,16 @@
       let tablesNeeded = getActiveTablesCount(cfg.totalTeams);
       let tableNum = parseInt(currentTableKey.replace('Table', ''));
       let nextTable = tableNum < tablesNeeded ? tableNum + 1 : 1;
-      let hasBye = cfg.totalTeams % 2 !== 0;
 
-      let movementInstruction = `Play Boards 1 to ${cfg.boardsCount} at <b>${currentTableKey}</b>. After round completion, <b>Move to Table No. ${nextTable}</b> or pass board set accordingly.`;
-      if (hasBye && cfg.totalTeams - tableNum * 2 < 0) {
-        movementInstruction = `<b class="text-red-600">BYE ROUND:</b> This table is on standby / BYE for the current round. Rest at designated seating area.`;
-      }
+      let startB = ((tableNum - 1) * cfg.boardsCount) + 1;
+      let endB = tableNum * cfg.boardsCount;
+
+      let movementInstruction = `Play <b>Boards ${startB} to ${endB}</b> at <b>${currentTableKey}</b>. After round completion, <b>Move to Table No. ${nextTable}</b> or pass board set to Table No. ${nextTable}.`;
 
       container.innerHTML = `
         <div class="bg-slate-50 p-3 rounded-lg border space-y-2 text-xs">
-          <div class="font-bold text-slate-700">System: <span class="text-blue-600">${cfg.movement}</span> (${cfg.totalTeams} Teams, ${tablesNeeded} Active Tables)</div>
-          <div class="text-slate-600">Match configuration: <b>${cfg.boardsCount} Boards</b> per round (Boards 1 - ${cfg.boardsCount}).</div>
+          <div class="font-bold text-slate-700">System: <span class="text-blue-600">${cfg.movement}</span> (${cfg.totalTeams} Teams, ${tablesNeeded} Tables)</div>
+          <div class="text-slate-600">Assigned Boards for this station: <b>Boards ${startB} - ${endB}</b> (${cfg.boardsCount} boards).</div>
           
           <div class="border-t pt-2 space-y-1">
             <div class="font-bold text-slate-800">📍 Current Location: <span class="text-purple-600">${currentTableKey}</span></div>
@@ -554,7 +561,7 @@
     }
 
     function saveAndRefresh() {
-      localStorage.setItem("bridge_v24_data", JSON.stringify(globalState));
+      localStorage.setItem("bridge_v26_data", JSON.stringify(globalState));
       renderAll();
     }
 
