@@ -282,10 +282,15 @@
   </div>
 
   <script>
-    // Bulletproof DB Initialization & Migration Check
-    let db = JSON.parse(localStorage.getItem("bridge_v45_db") || "null");
+    // Bulletproof Safe DB Initialization (v47)
+    let db = null;
+    try {
+      db = JSON.parse(localStorage.getItem("bridge_v47_db") || "null");
+    } catch (e) {
+      db = null;
+    }
 
-    if (!db || !db.matches || typeof db.matches !== 'object') {
+    if (!db || !db.matches || typeof db.matches !== 'object' || Object.keys(db.matches).length === 0) {
       db = {
         matches: {
           "Match 1": { 
@@ -337,7 +342,7 @@
         if (!m.tables[tKey]) {
           m.tables[tKey] = { N: ``, S: ``, E: ``, W: `` };
         }
-        if (!m.scores[tKey] || m.scores[tKey].length !== m.config.boardsCount) {
+        if (!m.scores[tKey] || !Array.isArray(m.scores[tKey]) || m.scores[tKey].length !== m.config.boardsCount) {
           m.scores[tKey] = generateBoardsArray(m.config.boardsCount, i);
         }
       }
@@ -388,7 +393,4 @@
       const nameInput = document.getElementById('newMatchNameInput');
       const name = nameInput.value.trim();
       const teams = parseInt(document.getElementById('newMatchTeams').value);
-      const boards = parseInt(document.getElementById('newMatchBoards').value);
-      const movement = document.getElementById('newMatchMovement').value;
-
-      if
+      const
