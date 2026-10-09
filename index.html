@@ -130,13 +130,16 @@
           </div>
         </div>
 
-        <!-- Movement Selection -->
+        <!-- Expanded Movement Selection -->
         <div class="space-y-1.5 text-xs">
           <label class="block font-semibold text-slate-700">Select Board Movement / System:</label>
           <select id="adminMovementSelect" onchange="updateAdminConfig()" class="w-full border rounded p-2 bg-slate-50 font-bold">
             <option value="RoundRobin">1. Multi-Table Round Robin (1 Team = 1 Table)</option>
-            <option value="Mitchell">2. Mitchell Team Movement</option>
+            <option value="Mitchell">2. Mitchell Team Movement (Standard)</option>
             <option value="Swiss">3. Swiss Teams Movement</option>
+            <option value="Howell">4. Howell Movement (Individual/Pairs)</option>
+            <option value="BAM">5. BAM (Board-a-Match / Point-a-Board)</option>
+            <option value="SharedBoards">6. Shared Boards / Round Royale</option>
           </select>
         </div>
 
@@ -215,7 +218,7 @@
   </div>
 
   <script>
-    let db = JSON.parse(localStorage.getItem("bridge_v33_db") || "null");
+    let db = JSON.parse(localStorage.getItem("bridge_v34_db") || "null");
 
     if (!db) {
       db = {
@@ -341,10 +344,10 @@
       for (let i = 1; i <= tCount; i++) {
         let tKey = `Table${i}`;
         let t = m.tables[tKey] || { N: '', S: '', E: '', W: '' };
-        let nsDesc = (t.N || t.S) ? `(${t.N || 'N'}/${t.S || 'S'})` : `(Team ${i})`;
+        let nsDesc = (t.N || t.S) ? `(${t.N \vert{}\vert{} 'N'}/${t.S || 'S'})` : `(Team ${i})`;
         let opt = document.createElement('option');
         opt.value = tKey;
-        opt.innerText = `Table ${i} ${nsDesc}`;
+        opt.innerText = `Table ${i}${nsDesc}`;
         if (tKey === currentTableKey) opt.selected = true;
         select.appendChild(opt);
       }
@@ -493,22 +496,22 @@
       for (let i = 1; i <= tablesNeeded; i++) {
         let startB = ((i - 1) * boardsPerRound) + 1;
         let endB = i * boardsPerRound;
-        placementHTML += `<div>• <b>Boards ${startB} - ${endB}</b> placed at <b>Table ${i}</b> (Team ${i} Station).</div>`;
+        placementHTML += `<div>• <b>Boards ${startB} -${endB}</b> placed at <b>Table ${i}</b> (Team${i} Station).</div>`;
       }
 
       let hasBye = totalTeams % 2 !== 0;
       let standbyMsg = hasBye 
-        ? `<div class="text-red-700 font-bold">• Standby / BYE: Team ${totalTeams} is resting/standby between Table ${tablesNeeded} and scoring desk.</div>` 
+        ? `<div class="text-red-700 font-bold">• Standby / BYE: Team ${totalTeams} is resting/standby between Table${tablesNeeded} and scoring desk.</div>` 
         : `<div>• Standby / BYE: None (Even number of teams).</div>`;
 
       let prepHTML = `
         <div>• <b>Active Match:</b> ${db.currentMatch}</div>
+        <div>• <b>Movement System:</b> ${cfg.movement}</div>
         <div>• <b>Total Teams / Tables:</b> ${totalTeams} Teams (${tablesNeeded} Tables active).</div>
         <div>• <b>Boards per Round:</b> ${boardsPerRound} boards per table.</div>
         <div>• <b>Total Board Sets Needed:</b> ${totalBoardsNeeded} boards in total.</div>
         <div class="border-t border-amber-200 pt-1 mt-1 font-bold text-amber-900">Exact Board Placement:</div>
-        ${placementHTML}
-        ${hasBye ? standbyMsg : ''}
+        ${placementHTML}${hasBye ? standbyMsg : ''}
       `;
       document.getElementById('materialPrepContent').innerHTML = prepHTML;
 
@@ -525,7 +528,7 @@
 
         standingsHTML += `
           <tr>
-            <td class="border p-2 font-bold">Team ${i} (Table ${i})</td>
+            <td class="border p-2 font-bold">Team ${i} (Table${i})</td>
             <td class="border p-2 text-blue-600 font-bold">${totalImp >= 0 ? '+' + totalImp : totalImp} IMPs</td>
             <td class="border p-2 text-purple-700 font-black">${vp} VP</td>
             <td class="border p-2 text-green-600 font-semibold">Active</td>
@@ -576,7 +579,7 @@
       let startB = ((tableNum - 1) * cfg.boardsCount) + 1;
       let endB = tableNum * cfg.boardsCount;
 
-      let movementInstruction = `Play <b>Boards ${startB} to ${endB}</b> at <b>${currentTableKey}</b>. After round completion, <b>Move to Table No. ${nextTable}</b> or pass board set to Table No. ${nextTable}.`;
+      let movementInstruction = `Play <b>Boards ${startB} to ${endB}</b> at <b>${currentTableKey}</b> according to <span class="text-blue-600 font-bold">${cfg.movement}</span>. After round completion, <b>Move to Table No. ${nextTable}</b> or pass board set accordingly.`;
 
       container.innerHTML = `
         <div class="bg-slate-50 p-3 rounded-lg border space-y-2 text-xs">
@@ -747,7 +750,7 @@
     }
 
     function saveDB() {
-      localStorage.setItem("bridge_v33_db", JSON.stringify(db));
+      localStorage.setItem("bridge_v34_db", JSON.stringify(db));
     }
 
     function saveAndRefresh() {
@@ -775,9 +778,9 @@
       let bannerHTML = `<div class="flex justify-between items-center w-full font-bold"><span class="text-yellow-300">Active Match: ${db.currentMatch}</span></div>`;
       for (let tKey in m.tables) {
         let t = m.tables[tKey];
-        let nsStr = (t.N || t.S) ? `${t.N || 'N'}/${t.S || 'S'}` : 'N/S Team';
-        let ewStr = (t.E || t.W) ? `${t.E || 'E'}/${t.W || 'W'}` : 'E/W Opponent';
-        bannerHTML += `<div class="flex justify-between items-center w-full font-bold"><span class="text-blue-400">${tKey}: ${nsStr} vs ${ewStr}</span></div>`;
+        let nsStr = (t.N || t.S) ? `${t.N \vert{}\vert{} 'N'}/${t.S || 'S'}` : 'N/S Team';
+        let ewStr = (t.E || t.W) ? `${t.E \vert{}\vert{} 'E'}/${t.W || 'W'}` : 'E/W Opponent';
+        bannerHTML += `<div class="flex justify-between items-center w-full font-bold"><span class="text-blue-400">${tKey}: ${nsStr} vs${ewStr}</span></div>`;
       }
       bannerEl.innerHTML = `<div class="max-w-xl mx-auto flex flex-col gap-1">${bannerHTML}</div>`;
 
@@ -822,129 +825,4 @@
                 </div>
                 <button onclick="selectDeclarer(${idx}, 'S')" class="step-btn w-36 truncate ${myData.declarer === 'S' ? 'selected' : ''}">South (${activeTable.S || 'S'})</button>
               </div>
-            </div>
-          `;
-        }
-
-        let doubleHtml = '';
-        if (step2Done && !isLocked) {
-          doubleHtml = `
-            <div class="mt-3 pt-2 border-t border-slate-100">
-              <div class="text-[11px] font-bold text-slate-500 mb-1">Step 3: Select Double:</div>
-              <div class="flex gap-1.5">
-                <button onclick="selectDouble(${idx}, 'NONE')" class="step-btn flex-1 py-2 ${myData.dbl === 'NONE' ? 'selected' : ''}">None</button>
-                <button onclick="selectDouble(${idx}, 'X')" class="step-btn flex-1 py-2 ${myData.dbl === 'X' ? 'selected-dbl' : ''}">X (Dbl)</button>
-                <button onclick="selectDouble(${idx}, 'XX')" class="step-btn flex-1 py-2 ${myData.dbl === 'XX' ? 'selected-dbl' : ''}">XX (Rdbl)</button>
-              </div>
-            </div>
-          `;
-        }
-
-        let resultHtml = '';
-        if (step3Done && !isLocked) {
-          const levelNum = parseInt(myData.level);
-          const maxOver = 7 - levelNum;
-          const maxUnder = levelNum + 6;
-
-          let overButtonsHtml = '';
-          for (let i = 1; i <= maxOver; i++) {
-            overButtonsHtml += `<button onclick="selectResult(${idx}, '${i}')" class="res-btn ${myData.result == i ? 'selected' : ''}">+${i}</button>`;
-          }
-          let underButtonsHtml = '';
-          for (let i = 1; i <= maxUnder; i++) {
-            underButtonsHtml += `<button onclick="selectResult(${idx}, '${-i}')" class="res-btn ${myData.result == -i ? 'selected' : ''}">-${i}</button>`;
-          }
-
-          resultHtml = `
-            <div class="mt-3 pt-2 border-t border-slate-100 space-y-2">
-              <div class="text-[11px] font-bold text-slate-500">Step 4: Select Result:</div>
-              ${maxOver > 0 ? `<div><div class="text-[10px] text-blue-600 font-semibold mb-1">Overtricks:</div><div class="grid grid-cols-7 gap-1">${overButtonsHtml}</div></div>` : ''}
-              <div class="flex justify-center py-1">
-                <button onclick="selectResult(${idx}, '0')" class="w-full py-2.5 rounded-lg border text-base font-black shadow-sm ${myData.result === '0' ? 'bg-blue-600 text-white border-blue-700' : 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'}">= (Made)</button>
-              </div>
-              <div><div class="text-[10px] text-red-600 font-semibold mb-1">Undertricks:</div><div class="grid grid-cols-7 gap-1">${underButtonsHtml}</div></div>
-            </div>
-          `;
-        }
-
-        const hasHandRec = b.handRecordPhoto;
-        const hasTraveler = b.travelerPhoto;
-
-        const card = document.createElement('div');
-        card.className = "bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-2";
-        card.innerHTML = `
-          <div class="flex justify-between items-center border-b pb-2">
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-base text-slate-800">Board ${b.boardNum}</span>
-              <span class="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600">Vul: ${b.vul}</span>
-            </div>
-            <div class="flex text-xs font-semibold rounded overflow-hidden border">
-              <span class="px-1.5 py-0.5 ${vulN ? 'vul-active' : 'bg-slate-50 text-slate-400'}">N</span>
-              <span class="px-1.5 py-0.5 ${vulS ? 'vul-active' : 'bg-slate-50 text-slate-400'}">S</span>
-              <span class="px-1.5 py-0.5 ${vulE ? 'vul-active' : 'bg-slate-50 text-slate-400'}">E</span>
-              <span class="px-1.5 py-0.5 ${vulW ? 'vul-active' : 'bg-slate-50 text-slate-400'}">W</span>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-2 text-xs pt-1">
-            <div class="bg-slate-50 p-2 rounded border flex flex-col justify-between">
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-slate-600 font-medium">♠️ Hand Record:</span>
-                <span class="font-bold ${hasHandRec ? 'text-green-600' : 'text-amber-600'}">${hasHandRec ? '✅' : '⏳'}</span>
-              </div>
-              <label class="bg-slate-800 hover:bg-slate-900 text-white py-1 rounded cursor-pointer text-center font-bold">
-                ${hasHandRec ? 'Change' : 'Upload Hand Rec'}
-                <input type="file" accept="image/*" onchange="handleHandRecordPhoto(${idx}, event)" class="hidden">
-              </label>
-            </div>
-
-            <div class="bg-slate-50 p-2 rounded border flex flex-col justify-between">
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-slate-600 font-medium">📋 Traveler / Result:</span>
-                <span class="font-bold ${hasTraveler ? 'text-green-600' : 'text-amber-600'}">${hasTraveler ? '✅' : '⏳'}</span>
-              </div>
-              <label class="bg-blue-600 hover:bg-blue-700 text-white py-1 rounded cursor-pointer text-center font-bold">
-                ${hasTraveler ? 'Change' : 'Upload Traveler'}
-                <input type="file" accept="image/*" onchange="handleTravelerPhoto(${idx}, event)" class="hidden">
-              </label>
-            </div>
-          </div>
-
-          <div><div class="text-[11px] font-bold text-slate-500 mb-1">Step 1: Select Contract (1♣ - 7NT):</div>${matrixHtml}</div>
-          ${declarerHtml}
-          ${doubleHtml}
-          ${resultHtml}
-
-          <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs mt-3">
-            <div>
-              <span class="font-bold text-slate-700">Contract:</span> 
-              <span class="font-bold text-blue-600">
-                ${myData.level ? myData.level + myData.suit : '-'}
-                ${myData.declarer ? ' by ' + myData.declarer : ''}
-                ${myData.dbl && myData.dbl !== 'NONE' ? ' ' + myData.dbl : ''}
-                ${myData.result !== "" ? ' (' + (myData.result === '0' ? '=' : parseInt(myData.result) > 0 ? '+' + myData.result : myData.result) + ')' : ''}
-              </span>
-              <br>
-              <span class="font-bold text-slate-700">Score:</span> <span class="font-black text-slate-900">${myData.score !== null ? (myData.score > 0 ? '+' + myData.score : myData.score) : '-'}</span>
-            </div>
-            <div>
-              ${myData.status === 'pending' ? `<button onclick="confirmScore(${idx})" class="bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1.5 rounded text-xs shadow-sm">✅ Confirm</button>` : myData.status === 'confirmed' ? `<button onclick="editScore(${idx})" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2.5 py-1 rounded text-xs border border-slate-300">✏️ Edit</button>` : ''}
-            </div>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-
-      document.getElementById('matchSummaryTitle').innerText = `${currentTableKey} Cumulative Raw Score`;
-      document.getElementById('teamANameLabel').innerText = `${currentTableKey} N/S`;
-      document.getElementById('teamBNameLabel').innerText = `${currentTableKey} E/W`;
-      document.getElementById('teamAScore').innerText = totalTableScore;
-      document.getElementById('teamBScore').innerText = 0;
-    }
-
-    refreshMatchDropdowns();
-    updateTableDropdown();
-    renderAll();
-  </script>
-</body>
-</html>
+            
