@@ -42,10 +42,12 @@
     <!-- ================= SCORING VIEW ================= -->
     <div id="viewScoring" class="space-y-4">
       <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-3">
-        <h2 class="font-bold text-sm text-slate-600">1. Match & Multi-Table Selection</h2>
+        <h2 class="font-bold text-sm text-slate-600">1. Select Match & Multi-Table</h2>
         <div class="flex gap-2">
-          <input type="text" id="matchNumberInput" placeholder="Match Number (e.g. Match 1)" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <button onclick="joinMatch()" class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Set Match</button>
+          <select id="matchDropdownSelect" class="flex-1 border rounded-lg px-3 py-2 text-sm bg-slate-50 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">-- Select Active Match --</option>
+          </select>
+          <button onclick="joinSelectedMatch()" class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Join Match</button>
         </div>
 
         <div class="grid grid-cols-2 gap-2 text-xs">
@@ -98,6 +100,18 @@
           <button onclick="lockAdminDevice()" class="text-[11px] bg-red-100 text-red-700 hover:bg-red-200 font-bold px-2.5 py-1 rounded border border-red-300">🔒 Lock Device</button>
         </div>
         
+        <!-- Match Creation & Management Section -->
+        <div class="bg-slate-50 p-3 rounded-lg border space-y-2 text-xs">
+          <div class="font-bold text-slate-700">📌 Match Management (Create & Close):</div>
+          <div class="flex gap-2">
+            <input type="text" id="newMatchNameInput" placeholder="Match Name (e.g. Match 1)" class="flex-1 border rounded px-2 py-1.5 text-xs bg-white font-bold">
+            <button onclick="createMatchByAdmin()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded text-xs">➕ Create Match</button>
+          </div>
+          <div class="space-y-1 pt-1" id="adminMatchListContainer">
+            <!-- Dynamically populated match list with Open/Close toggles -->
+          </div>
+        </div>
+
         <div class="grid grid-cols-2 gap-3 text-xs">
           <div>
             <label class="block font-semibold text-slate-600 mb-1">Total Teams in Event:</label>
@@ -146,7 +160,7 @@
                 </tr>
               </thead>
               <tbody id="adminTableBody">
-                <tr><td colspan="4" class="text-center p-3 text-slate-400">No data loaded yet</td></tr>
+                <tr><td colspan="4" class="text-center p-3 text-slate-400">No active match selected</td></tr>
               </tbody>
             </table>
           </div>
@@ -201,7 +215,20 @@
   </div>
 
   <script>
-    let currentMatch = "Match 1";
+    let db = JSON.parse(localStorage.getItem("bridge_v31_db") || "null");
+
+    if (!db) {
+      db = {
+        matches: {
+          "Match 1": { status: "open", config: { totalTeams: 3, boardsCount: 2, movement: "RoundRobin" }, tables: {}, scores: {} }
+        },
+        currentMatch: "Match 1"
+      };
+      // Initialize Match 1 tables
+      initMatchStructure("Match 1");
+      saveDB();
+    }
+
     let currentTableKey = "Table1";
 
     const defaultVulSchedule = [
@@ -213,41 +240,21 @@
 
     const suits = ["♣", "♦", "♥", "♠", "NT"];
 
-    let globalState = JSON.parse(localStorage.getItem("bridge_v30_data") || "{}");
-
     function getActiveTablesCount(totalTeams) {
       return totalTeams;
     }
 
-    function initMatch(matchName) {
-      if (!globalState[matchName]) {
-        let totalTeams = 3;
-        let boardsCount = 2;
-        let tablesCount = getActiveTablesCount(totalTeams);
-        let initialTables = {};
-        let initialScores = {};
-
-        for (let i = 1; i <= tablesCount; i++) {
-          initialTables[`Table${i}`] = { N: ``, S: ``, E: ``, W: `` };
-          initialScores[`Table${i}`] = generateBoardsArray(boardsCount, i);
+    function initMatchStructure(matchName) {
+      if (!db.matches[matchName]) return;
+      let m = db.matches[matchName];
+      let tCount = getActiveTablesCount(m.config.totalTeams);
+      for (let i = 1; i <= tCount; i++) {
+        let tKey = `Table${i}`;
+        if (!m.tables[tKey]) {
+          m.tables[tKey] = { N: ``, S: ``, E: ``, W: `` };
         }
-
-        globalState[matchName] = {
-          config: { totalTeams: totalTeams, boardsCount: boardsCount, movement: "RoundRobin" },
-          tables: initialTables,
-          scores: initialScores
-        };
-      } else {
-        let cfg = globalState[matchName].config;
-        let tCount = getActiveTablesCount(cfg.totalTeams);
-        for (let i = 1; i <= tCount; i++) {
-          let tKey = `Table${i}`;
-          if (!globalState[matchName].tables[tKey]) {
-            globalState[matchName].tables[tKey] = { N: ``, S: ``, E: ``, W: `` };
-          }
-          if (!globalState[matchName].scores[tKey] || globalState[matchName].scores[tKey].length !== cfg.boardsCount) {
-            globalState[matchName].scores[tKey] = generateBoardsArray(boardsCount, i);
-          }
+        if (!m.scores[tKey] || m.scores[tKey].length !== m.config.boardsCount) {
+          m.scores[tKey] = generateBoardsArray(m.config.boardsCount, i);
         }
       }
     }
@@ -266,28 +273,78 @@
       });
     }
 
-    function joinMatch() {
-      const code = document.getElementById('matchNumberInput').value.trim();
-      if (!code) return alert("Please enter a match number!");
-      currentMatch = code;
-      initMatch(currentMatch);
+    function refreshMatchDropdowns() {
+      const select = document.getElementById('matchDropdownSelect');
+      select.innerHTML = '<option value="">-- Select Active Match --</option>';
+      for (let mName in db.matches) {
+        let m = db.matches[mName];
+        if (m.status === 'open') {
+          let opt = document.createElement('option');
+          opt.value = mName;
+          opt.innerText = mName + " (Open)";
+          if (mName === db.currentMatch) opt.selected = true;
+          select.appendChild(opt);
+        }
+      }
+    }
+
+    function joinSelectedMatch() {
+      const select = document.getElementById('matchDropdownSelect');
+      const val = select.value;
+      if (!val) return alert("Please select an open match!");
+      db.currentMatch = val;
+      initMatchStructure(db.currentMatch);
       updateTableDropdown();
-      renderAll();
+      saveAndRefresh();
+    }
+
+    function createMatchByAdmin() {
+      const input = document.getElementById('newMatchNameInput');
+      const name = input.value.trim();
+      if (!name) return alert("Please enter a match name!");
+      if (db.matches[name]) return alert("Match name already exists!");
+
+      db.matches[name] = {
+        status: "open",
+        config: { totalTeams: 3, boardsCount: 2, movement: "RoundRobin" },
+        tables: {},
+        scores: {}
+      };
+      initMatchStructure(name);
+      input.value = "";
+      db.currentMatch = name;
+      saveAndRefresh();
+      alert(`Match '${name}' created successfully and set as active!`);
+    }
+
+    function toggleMatchStatus(matchName) {
+      if (db.matches[matchName].status === 'open') {
+        db.matches[matchName].status = 'closed';
+        if (db.currentMatch === matchName) {
+          // Switch to another open match if possible
+          let openMatches = Object.keys(db.matches).filter(k => db.matches[k].status === 'open');
+          db.currentMatch = openMatches.length > 0 ? openMatches[0] : "";
+        }
+      } else {
+        db.matches[matchName].status = 'open';
+        db.currentMatch = matchName;
+      }
+      saveAndRefresh();
     }
 
     function updateTableDropdown() {
-      const matchData = globalState[currentMatch];
-      if (!matchData) return;
-      const tCount = getActiveTablesCount(matchData.config.totalTeams);
+      if (!db.currentMatch || !db.matches[db.currentMatch]) return;
+      const m = db.matches[db.currentMatch];
+      const tCount = getActiveTablesCount(m.config.totalTeams);
       const select = document.getElementById('roomTypeSelect');
       select.innerHTML = '';
       for (let i = 1; i <= tCount; i++) {
         let tKey = `Table${i}`;
-        let t = matchData.tables[tKey];
-        let nsDesc = (t.N || t.S) ? `(${t.N \vert{}\vert{} 'N'}/${t.S || 'S'})` : `(Team ${i})`;
+        let t = m.tables[tKey] || { N: '', S: '', E: '', W: '' };
+        let nsDesc = (t.N || t.S) ? `(${t.N || 'N'}/${t.S || 'S'})` : `(Team ${i})`;
         let opt = document.createElement('option');
         opt.value = tKey;
-        opt.innerText = `Table ${i}${nsDesc}`;
+        opt.innerText = `Table ${i} ${nsDesc}`;
         if (tKey === currentTableKey) opt.selected = true;
         select.appendChild(opt);
       }
@@ -356,8 +413,9 @@
     }
 
     function openSeatingModal() {
-      initMatch(currentMatch);
-      const t = globalState[currentMatch].tables[currentTableKey];
+      if (!db.currentMatch) return alert("Please join a match first!");
+      const m = db.matches[db.currentMatch];
+      const t = m.tables[currentTableKey] || { N: '', S: '', E: '', W: '' };
       document.getElementById('seatingModalTitle').innerText = `Enter Seating for ${currentTableKey}`;
       document.getElementById('inputNorth').value = t.N;
       document.getElementById('inputSouth').value = t.S;
@@ -375,8 +433,8 @@
     }
 
     function saveSeatingModal() {
-      initMatch(currentMatch);
-      globalState[currentMatch].tables[currentTableKey] = {
+      if (!db.currentMatch) return;
+      db.matches[db.currentMatch].tables[currentTableKey] = {
         N: document.getElementById('inputNorth').value.trim(),
         S: document.getElementById('inputSouth').value.trim(),
         E: document.getElementById('inputEast').value.trim(),
@@ -387,31 +445,29 @@
     }
 
     function updateAdminConfig() {
-      initMatch(currentMatch);
+      if (!db.currentMatch) return;
+      const m = db.matches[db.currentMatch];
       const teams = parseInt(document.getElementById('adminTotalTeams').value);
       const boards = parseInt(document.getElementById('adminBoardsCount').value);
       const movement = document.getElementById('adminMovementSelect').value;
       
-      globalState[currentMatch].config.totalTeams = teams;
-      globalState[currentMatch].config.boardsCount = boards;
-      globalState[currentMatch].config.movement = movement;
+      m.config.totalTeams = teams;
+      m.config.boardsCount = boards;
+      m.config.movement = movement;
 
-      let tCount = getActiveTablesCount(teams);
-      for (let i = 1; i <= tCount; i++) {
-        let tKey = `Table${i}`;
-        if (!globalState[currentMatch].tables[tKey]) {
-          globalState[currentMatch].tables[tKey] = { N: ``, S: ``, E: ``, W: `` };
-        }
-        globalState[currentMatch].scores[tKey] = generateBoardsArray(boards, i);
-      }
-
+      initMatchStructure(db.currentMatch);
       updateTableDropdown();
       saveAndRefresh();
     }
 
     function renderAdminPanel() {
-      initMatch(currentMatch);
-      const cfg = globalState[currentMatch].config;
+      refreshAdminMatchList();
+      if (!db.currentMatch || !db.matches[db.currentMatch]) {
+        document.getElementById('adminTableBody').innerHTML = `<tr><td colspan="4" class="text-center p-3 text-slate-400">Please create and select a match</td></tr>`;
+        return;
+      }
+      const m = db.matches[db.currentMatch];
+      const cfg = m.config;
       document.getElementById('adminTotalTeams').value = cfg.totalTeams;
       document.getElementById('adminBoardsCount').value = cfg.boardsCount;
       document.getElementById('adminMovementSelect').value = cfg.movement;
@@ -425,28 +481,29 @@
       for (let i = 1; i <= tablesNeeded; i++) {
         let startB = ((i - 1) * boardsPerRound) + 1;
         let endB = i * boardsPerRound;
-        placementHTML += `<div>• <b>Boards ${startB} -${endB}</b> placed at <b>Table ${i}</b> (Team${i} Station).</div>`;
+        placementHTML += `<div>• <b>Boards ${startB} - ${endB}</b> placed at <b>Table ${i}</b> (Team ${i} Station).</div>`;
       }
 
       let hasBye = totalTeams % 2 !== 0;
       let standbyMsg = hasBye 
-        ? `<div class="text-red-700 font-bold">• Standby / BYE: Team ${totalTeams} is resting/standby between Table${tablesNeeded} and scoring desk.</div>` 
+        ? `<div class="text-red-700 font-bold">• Standby / BYE: Team ${totalTeams} is resting/standby between Table ${tablesNeeded} and scoring desk.</div>` 
         : `<div>• Standby / BYE: None (Even number of teams).</div>`;
 
       let prepHTML = `
+        <div>• <b>Active Match:</b> ${db.currentMatch}</div>
         <div>• <b>Total Teams / Tables:</b> ${totalTeams} Teams (${tablesNeeded} Tables active).</div>
         <div>• <b>Boards per Round:</b> ${boardsPerRound} boards per table.</div>
         <div>• <b>Total Board Sets Needed:</b> ${totalBoardsNeeded} boards in total.</div>
         <div class="border-t border-amber-200 pt-1 mt-1 font-bold text-amber-900">Exact Board Placement:</div>
-        ${placementHTML}${hasBye ? standbyMsg : ''}
+        ${placementHTML}
+        ${hasBye ? standbyMsg : ''}
       `;
       document.getElementById('materialPrepContent').innerHTML = prepHTML;
 
-      const matchData = globalState[currentMatch];
       let standingsHTML = "";
       for (let i = 1; i <= totalTeams; i++) {
         let tKey = `Table${i}`;
-        let tScores = matchData.scores[tKey] || [];
+        let tScores = m.scores[tKey] || [];
         let totalImp = tScores.reduce((acc, cur) => acc + (cur.scoring.score || 0), 0);
         
         let vp = 10 + (totalImp / 10);
@@ -456,7 +513,7 @@
 
         standingsHTML += `
           <tr>
-            <td class="border p-2 font-bold">Team ${i} (Table${i})</td>
+            <td class="border p-2 font-bold">Team ${i} (Table ${i})</td>
             <td class="border p-2 text-blue-600 font-bold">${totalImp >= 0 ? '+' + totalImp : totalImp} IMPs</td>
             <td class="border p-2 text-purple-700 font-black">${vp} VP</td>
             <td class="border p-2 text-green-600 font-semibold">Active</td>
@@ -466,11 +523,36 @@
       document.getElementById('adminTableBody').innerHTML = standingsHTML;
     }
 
+    function refreshAdminMatchList() {
+      const container = document.getElementById('adminMatchListContainer');
+      container.innerHTML = '';
+      for (let mName in db.matches) {
+        let m = db.matches[mName];
+        let isOpen = m.status === 'open';
+        let isCurrent = mName === db.currentMatch;
+
+        let div = document.createElement('div');
+        div.className = "flex justify-between items-center bg-white p-2 rounded border text-xs";
+        div.innerHTML = `
+          <div>
+            <span class="font-bold ${isCurrent ? 'text-blue-600' : 'text-slate-800'}">${mName}</span>
+            <span class="ml-2 text-[10px] px-1.5 py-0.5 rounded font-bold ${isOpen ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${isOpen ? 'OPEN' : 'CLOSED'}</span>
+          </div>
+          <div class="flex gap-1">
+            <button onclick="toggleMatchStatus('${mName}')" class="px-2 py-1 rounded font-bold text-[10px] ${isOpen ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}">
+              ${isOpen ? 'Close Match' : 'Re-open'}
+            </button>
+          </div>
+        `;
+        container.appendChild(div);
+      }
+    }
+
     function renderMovementSummary() {
-      initMatch(currentMatch);
-      const matchData = globalState[currentMatch];
-      const cfg = matchData.config;
-      const activeTable = matchData.tables[currentTableKey];
+      if (!db.currentMatch || !db.matches[db.currentMatch]) return;
+      const m = db.matches[db.currentMatch];
+      const cfg = m.config;
+      const activeTable = m.tables[currentTableKey] || { N: '', S: '', E: '', W: '' };
       const container = document.getElementById('movementSummaryCard');
 
       let tablesNeeded = getActiveTablesCount(cfg.totalTeams);
@@ -480,11 +562,11 @@
       let startB = ((tableNum - 1) * cfg.boardsCount) + 1;
       let endB = tableNum * cfg.boardsCount;
 
-      let movementInstruction = `Play <b>Boards ${startB} to ${endB}</b> at <b>${currentTableKey}</b>. After round completion, <b>Move to Table No. ${nextTable}</b> or pass board set to Table No.${nextTable}.`;
+      let movementInstruction = `Play <b>Boards ${startB} to ${endB}</b> at <b>${currentTableKey}</b>. After round completion, <b>Move to Table No. ${nextTable}</b> or pass board set to Table No. ${nextTable}.`;
 
       container.innerHTML = `
         <div class="bg-slate-50 p-3 rounded-lg border space-y-2 text-xs">
-          <div class="font-bold text-slate-700">System: <span class="text-blue-600">${cfg.movement}</span> (${cfg.totalTeams} Teams,${tablesNeeded} Tables)</div>
+          <div class="font-bold text-slate-700">Match: <span class="text-indigo-600">${db.currentMatch}</span> | System: <span class="text-blue-600">${cfg.movement}</span></div>
           <div class="text-slate-600">Assigned Boards for this station: <b>Boards ${startB} - ${endB}</b> (${cfg.boardsCount} boards).</div>
           
           <div class="border-t pt-2 space-y-1">
@@ -598,8 +680,8 @@
     }
 
     function selectResult(idx, resVal) {
-      const matchData = globalState[currentMatch];
-      const b = matchData.scores[currentTableKey][idx];
+      const m = db.matches[db.currentMatch];
+      const b = m.scores[currentTableKey][idx];
       const target = getTargetScoring(idx);
       if (target.status === 'confirmed') return;
       target.result = resVal.toString();
@@ -609,7 +691,7 @@
     }
 
     function getTargetScoring(idx) {
-      return globalState[currentMatch].scores[currentTableKey][idx].scoring;
+      return db.matches[db.currentMatch].scores[currentTableKey][idx].scoring;
     }
 
     function confirmScore(idx) {
@@ -627,7 +709,7 @@
       if (!file) return;
       const reader = new FileReader();
       reader.onload = function(e) {
-        const b = globalState[currentMatch].scores[currentTableKey][idx];
+        const b = db.matches[db.currentMatch].scores[currentTableKey][idx];
         b.handRecordPhoto = { name: file.name, dataUrl: e.target.result };
         saveAndRefresh();
       };
@@ -639,36 +721,49 @@
       if (!file) return;
       const reader = new FileReader();
       reader.onload = function(e) {
-        const b = globalState[currentMatch].scores[currentTableKey][idx];
+        const b = db.matches[db.currentMatch].scores[currentTableKey][idx];
         b.travelerPhoto = { name: file.name, dataUrl: e.target.result };
         saveAndRefresh();
       };
       reader.readAsDataURL(file);
     }
 
+    function saveDB() {
+      localStorage.setItem("bridge_v31_db", JSON.stringify(db));
+    }
+
     function saveAndRefresh() {
-      localStorage.setItem("bridge_v30_data", JSON.stringify(globalState));
+      saveDB();
+      refreshMatchDropdowns();
+      updateTableDropdown();
       renderAll();
     }
 
     function renderAll() {
-      initMatch(currentMatch);
-      const matchData = globalState[currentMatch];
-      
-      let bannerHTML = '';
-      for (let tKey in matchData.tables) {
-        let t = matchData.tables[tKey];
-        let nsStr = (t.N || t.S) ? `${t.N \vert{}\vert{} 'N'}/${t.S || 'S'}` : 'N/S Team';
-        let ewStr = (t.E || t.W) ? `${t.E \vert{}\vert{} 'E'}/${t.W || 'W'}` : 'E/W Opponent';
-        bannerHTML += `<div class="flex justify-between items-center w-full font-bold"><span class="text-blue-400">${tKey}: ${nsStr} vs${ewStr}</span></div>`;
+      refreshMatchDropdowns();
+      if (!db.currentMatch || !db.matches[db.currentMatch]) {
+        document.getElementById('globalRosterBanner').innerHTML = `<div class="max-w-xl mx-auto font-bold text-amber-300">⚠️ No active match selected. Please ask TD to create/open a match.</div>`;
+        document.getElementById('boardsList').innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-500 text-sm">Please select and join a match above.</div>`;
+        return;
+      }
+
+      const m = db.matches[db.currentMatch];
+      initMatchStructure(db.currentMatch);
+
+      let bannerHTML = `<div class="flex justify-between items-center w-full font-bold"><span class="text-yellow-300">Active Match: ${db.currentMatch}</span></div>`;
+      for (let tKey in m.tables) {
+        let t = m.tables[tKey];
+        let nsStr = (t.N || t.S) ? `${t.N || 'N'}/${t.S || 'S'}` : 'N/S Team';
+        let ewStr = (t.E || t.W) ? `${t.E || 'E'}/${t.W || 'W'}` : 'E/W Opponent';
+        bannerHTML += `<div class="flex justify-between items-center w-full font-bold"><span class="text-blue-400">${tKey}: ${nsStr} vs ${ewStr}</span></div>`;
       }
       document.getElementById('globalRosterBanner').innerHTML = `<div class="max-w-xl mx-auto flex flex-col gap-1">${bannerHTML}</div>`;
 
       const container = document.getElementById('boardsList');
       container.innerHTML = '';
 
-      let tableScores = matchData.scores[currentTableKey];
-      let activeTable = matchData.tables[currentTableKey];
+      let tableScores = m.scores[currentTableKey] || [];
+      let activeTable = m.tables[currentTableKey] || { N: '', S: '', E: '', W: '' };
       let totalTableScore = tableScores.reduce((acc, cur) => acc + (cur.scoring.score || 0), 0);
 
       tableScores.forEach((b, idx) => {
@@ -774,4 +869,61 @@
             <div class="bg-slate-50 p-2 rounded border flex flex-col justify-between">
               <div class="flex justify-between items-center mb-1">
                 <span class="text-slate-600 font-medium">♠️ Hand Record:</span>
-                <span class="font-bold ${hasHandRec ? 'text-green-600' : 'text
+                <span class="font-bold ${hasHandRec ? 'text-green-600' : 'text-amber-600'}">${hasHandRec ? '✅' : '⏳'}</span>
+              </div>
+              <label class="bg-slate-800 hover:bg-slate-900 text-white py-1 rounded cursor-pointer text-center font-bold">
+                ${hasHandRec ? 'Change' : 'Upload Hand Rec'}
+                <input type="file" accept="image/*" onchange="handleHandRecordPhoto(${idx}, event)" class="hidden">
+              </label>
+            </div>
+
+            <div class="bg-slate-50 p-2 rounded border flex flex-col justify-between">
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-slate-600 font-medium">📋 Traveler / Result:</span>
+                <span class="font-bold ${hasTraveler ? 'text-green-600' : 'text-amber-600'}">${hasTraveler ? '✅' : '⏳'}</span>
+              </div>
+              <label class="bg-blue-600 hover:bg-blue-700 text-white py-1 rounded cursor-pointer text-center font-bold">
+                ${hasTraveler ? 'Change' : 'Upload Traveler'}
+                <input type="file" accept="image/*" onchange="handleTravelerPhoto(${idx}, event)" class="hidden">
+              </label>
+            </div>
+          </div>
+
+          <div><div class="text-[11px] font-bold text-slate-500 mb-1">Step 1: Select Contract (1♣ - 7NT):</div>${matrixHtml}</div>
+          ${declarerHtml}
+          ${doubleHtml}
+          ${resultHtml}
+
+          <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs mt-3">
+            <div>
+              <span class="font-bold text-slate-700">Contract:</span> 
+              <span class="font-bold text-blue-600">
+                ${myData.level ? myData.level + myData.suit : '-'}
+                ${myData.declarer ? ' by ' + myData.declarer : ''}
+                ${myData.dbl && myData.dbl !== 'NONE' ? ' ' + myData.dbl : ''}
+                ${myData.result !== "" ? ' (' + (myData.result === '0' ? '=' : parseInt(myData.result) > 0 ? '+' + myData.result : myData.result) + ')' : ''}
+              </span>
+              <br>
+              <span class="font-bold text-slate-700">Score:</span> <span class="font-black text-slate-900">${myData.score !== null ? (myData.score > 0 ? '+' + myData.score : myData.score) : '-'}</span>
+            </div>
+            <div>
+              ${myData.status === 'pending' ? `<button onclick="confirmScore(${idx})" class="bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1.5 rounded text-xs shadow-sm">✅ Confirm</button>` : myData.status === 'confirmed' ? `<button onclick="editScore(${idx})" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2.5 py-1 rounded text-xs border border-slate-300">✏️ Edit</button>` : ''}
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      document.getElementById('matchSummaryTitle').innerText = `${currentTableKey} Cumulative Raw Score`;
+      document.getElementById('teamANameLabel').innerText = `${currentTableKey} N/S`;
+      document.getElementById('teamBNameLabel').innerText = `${currentTableKey} E/W`;
+      document.getElementById('teamAScore').innerText = totalTableScore;
+      document.getElementById('teamBScore').innerText = 0;
+    }
+
+    refreshMatchDropdowns();
+    updateTableDropdown();
+    renderAll();
+  </script>
+</body>
+</html>
