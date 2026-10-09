@@ -10,7 +10,7 @@
     .vul-active { background-color: #ef4444 !important; color: #ffffff !important; font-weight: bold; }
     .contract-btn { font-size: 11px; padding: 6px 2px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 700; background-color: #f8fafc; }
     .contract-btn.selected { background-color: #2563eb !important; color: #ffffff !important; border-color: #1d4ed8 !important; }
-    .step-btn { flex: 1; padding: 8px 4px; border-radius: 6px; font-weight: 700; border: 1px solid #cbd5e1; background-color: #f8fafc; text-align: center; }
+    .step-btn { padding: 10px; border-radius: 8px; font-weight: 700; border: 1px solid #cbd5e1; background-color: #f8fafc; text-align: center; font-size: 13px; }
     .step-btn.selected { background-color: #059669 !important; color: #ffffff !important; border-color: #047857 !important; }
     .step-btn.selected-dbl { background-color: #dc2626 !important; color: #ffffff !important; border-color: #b91c1c !important; }
   </style>
@@ -74,7 +74,7 @@
 
     const suits = ["♣", "♦", "♥", "♠", "NT"];
 
-    let boardsData = JSON.parse(localStorage.getItem("bridge_v9_wizard_data") || "{}");
+    let boardsData = JSON.parse(localStorage.getItem("bridge_v10_data") || "{}");
 
     function initData(room) {
       if (!boardsData[room]) {
@@ -244,7 +244,7 @@
     }
 
     function saveAndRefresh() {
-      localStorage.setItem("bridge_v9_wizard_data", JSON.stringify(boardsData));
+      localStorage.setItem("bridge_v10_data", JSON.stringify(boardsData));
       renderBoards();
     }
 
@@ -281,7 +281,6 @@
         const step1Done = !!myData.level && !!myData.suit;
         const step2Done = step1Done && !!myData.declarer;
         const step3Done = step2Done && myData.dbl !== "";
-        const step4Done = step3Done && myData.result !== "";
 
         // 1. Matrix HTML (5x7)
         let matrixHtml = `<div class="grid grid-cols-5 gap-1">`;
@@ -300,61 +299,82 @@
         }
         matrixHtml += `</div>`;
 
-        // 2. Declarer Directions (N, S, E, W)
+        // 2. Diamond Shape Declarer Pad (North top, South bottom, West left, East right)
         let declarerHtml = '';
         if (step1Done && !isLocked) {
           declarerHtml = `
-            <div class="mt-3 pt-2 border-t border-slate-100 animate-fadeIn">
-              <div class="text-[11px] font-bold text-slate-500 mb-1">Step 2: 選擇莊家方向 (Declarer):</div>
-              <div class="flex gap-1.5">
-                ${['N','S','E','W'].map(d => `
-                  <button onclick="selectDeclarer(${idx}, '${myRoomKey}', '${d}')" 
-                          class="step-btn ${myData.declarer === d ? 'selected' : ''}">
-                    ${d}
-                  </button>
-                `).join('')}
+            <div class="mt-3 pt-2 border-t border-slate-100">
+              <div class="text-[11px] font-bold text-slate-500 mb-2">Step 2: 選擇莊家方向 (Declarer):</div>
+              <div class="flex flex-col items-center max-w-[180px] mx-auto gap-1">
+                <!-- North -->
+                <button onclick="selectDeclarer(${idx}, '${myRoomKey}', 'N')" class="step-btn w-16 ${myData.declarer === 'N' ? 'selected' : ''}">北 N</button>
+                <div class="flex gap-8 w-full justify-between">
+                  <!-- West -->
+                  <button onclick="selectDeclarer(${idx}, '${myRoomKey}', 'W')" class="step-btn w-16 ${myData.declarer === 'W' ? 'selected' : ''}">西 W</button>
+                  <!-- East -->
+                  <button onclick="selectDeclarer(${idx}, '${myRoomKey}', 'E')" class="step-btn w-16 ${myData.declarer === 'E' ? 'selected' : ''}">東 E</button>
+                </div>
+                <!-- South -->
+                <button onclick="selectDeclarer(${idx}, '${myRoomKey}', 'S')" class="step-btn w-16 ${myData.declarer === 'S' ? 'selected' : ''}">南 S</button>
               </div>
             </div>
           `;
         }
 
-        // 3. Double Options (No, X, XX)
+        // 3. Double Options
         let doubleHtml = '';
         if (step2Done && !isLocked) {
           doubleHtml = `
-            <div class="mt-3 pt-2 border-t border-slate-100 animate-fadeIn">
+            <div class="mt-3 pt-2 border-t border-slate-100">
               <div class="text-[11px] font-bold text-slate-500 mb-1">Step 3: 選擇加倍 (Double):</div>
               <div class="flex gap-1.5">
-                <button onclick="selectDouble(${idx}, '${myRoomKey}', 'NONE')" class="step-btn ${myData.dbl === 'NONE' ? 'selected' : ''}">No (---)</button>
-                <button onclick="selectDouble(${idx}, '${myRoomKey}', 'X')" class="step-btn ${myData.dbl === 'X' ? 'selected-dbl' : ''}">X (Double)</button>
-                <button onclick="selectDouble(${idx}, '${myRoomKey}', 'XX')" class="step-btn ${myData.dbl === 'XX' ? 'selected-dbl' : ''}">XX (Redouble)</button>
+                <button onclick="selectDouble(${idx}, '${myRoomKey}', 'NONE')" class="step-btn flex-1 py-2 ${myData.dbl === 'NONE' ? 'selected' : ''}">No (---)</button>
+                <button onclick="selectDouble(${idx}, '${myRoomKey}', 'X')" class="step-btn flex-1 py-2 ${myData.dbl === 'X' ? 'selected-dbl' : ''}">X (Double)</button>
+                <button onclick="selectDouble(${idx}, '${myRoomKey}', 'XX')" class="step-btn flex-1 py-2 ${myData.dbl === 'XX' ? 'selected-dbl' : ''}">XX (Redouble)</button>
               </div>
             </div>
           `;
         }
 
-        // 4. Result Grid Buttons
+        // 4. Result Grid Buttons (Overtricks Left, '=' Center, Undertricks Right)
         let resultHtml = '';
         if (step3Done && !isLocked) {
           const levelNum = parseInt(myData.level);
           const maxOver = 7 - levelNum;
           const maxUnder = levelNum + 6;
 
-          let resButtons = [];
-          resButtons.push({ label: '=', val: '0' });
-          for (let i = 1; i <= maxOver; i++) resButtons.push({ label: `+${i}`, val: i.toString() });
-          for (let i = 1; i <= maxUnder; i++) resButtons.push({ label: `-${i}`, val: `-${i}` });
+          let overButtons = [];
+          for (let i = maxOver; i >= 1; i--) overButtons.push({ label: `+${i}`, val: i.toString() });
+
+          let underButtons = [];
+          for (let i = 1; i <= maxUnder; i++) underButtons.push({ label: `-${i}`, val: `-${i}` });
 
           resultHtml = `
-            <div class="mt-3 pt-2 border-t border-slate-100 animate-fadeIn">
+            <div class="mt-3 pt-2 border-t border-slate-100">
               <div class="text-[11px] font-bold text-slate-500 mb-1">Step 4: 選擇合約結果 (Result):</div>
-              <div class="flex flex-wrap gap-1">
-                ${resButtons.map(r => `
-                  <button onclick="selectResult(${idx}, '${myRoomKey}', '${r.val}')" 
-                          class="px-3 py-1.5 rounded border text-xs font-bold transition-all ${myData.result === r.val ? 'bg-blue-600 text-white border-blue-700' : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100'}">
-                    ${r.label}
-                  </button>
-                `).join('')}
+              <div class="flex items-center justify-center gap-1.5 overflow-x-auto py-1">
+                <div class="flex gap-1">
+                  ${overButtons.map(r => `
+                    <button onclick="selectResult(${idx}, '${myRoomKey}', '${r.val}')" 
+                            class="px-2.5 py-2 rounded border text-xs font-bold bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100">
+                      ${r.label}
+                    </button>
+                  `).join('')}
+                </div>
+                
+                <button onclick="selectResult(${idx}, '${myRoomKey}', '0')" 
+                        class="px-4 py-2 rounded border text-sm font-black shadow-sm ${myData.result === '0' ? 'bg-blue-600 text-white border-blue-700' : 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'}">
+                  =
+                </button>
+
+                <div class="flex gap-1">
+                  ${underButtons.map(r => `
+                    <button onclick="selectResult(${idx}, '${myRoomKey}', '${r.val}')" 
+                            class="px-2.5 py-2 rounded border text-xs font-bold bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100">
+                      ${r.label}
+                    </button>
+                  `).join('')}
+                </div>
               </div>
             </div>
           `;
@@ -377,22 +397,15 @@
             </div>
           </div>
 
-          <!-- Step 1: Matrix -->
           <div>
             <div class="text-[11px] font-bold text-slate-500 mb-1">Step 1: 選擇合約 (1♣ - 7NT):</div>
             ${matrixHtml}
           </div>
 
-          <!-- Step 2: Declarer -->
           ${declarerHtml}
-
-          <!-- Step 3: Double -->
           ${doubleHtml}
-
-          <!-- Step 4: Result -->
           ${resultHtml}
 
-          <!-- Score Summary & Confirm Bar -->
           <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs mt-3">
             <div>
               <span class="font-bold text-slate-700">Contract:</span> 
