@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bridge Team Match IMP Calculator & Movement</title>
+  <title>Bridge Team Match IMP Calculator & Movement Guide</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -21,7 +21,7 @@
 
   <header class="bg-slate-900 text-white p-4 sticky top-0 z-50 shadow-md">
     <div class="max-w-xl mx-auto flex justify-between items-center">
-      <h1 class="font-bold text-base flex items-center gap-2"><span>♠️♥️</span> Bridge IMP & Admin</h1>
+      <h1 class="font-bold text-base flex items-center gap-2"><span>♠️♥️</span> Bridge IMP & Movement</h1>
       <div class="flex items-center gap-2">
         <button onclick="switchView('scoring')" id="btnViewScoring" class="text-xs bg-blue-600 px-3 py-1 rounded font-bold">Scoring</button>
         <button onclick="switchView('movement')" id="btnViewMovement" class="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded font-bold">📋 Movement</button>
@@ -30,9 +30,9 @@
     </div>
   </header>
 
-  <!-- Global Roster Header Banner -->
+  <!-- Global Roster Header Banner (Synced across all tables) -->
   <div id="globalRosterBanner" class="bg-slate-800 text-slate-200 text-xs py-2 px-4 shadow-inner">
-    <div class="max-w-xl mx-auto flex justify-between items-center overflow-x-auto whitespace-nowrap gap-4" id="rosterBannerContent">
+    <div class="max-w-xl mx-auto flex flex-col gap-1" id="rosterBannerContent">
       <span>Room not connected</span>
     </div>
   </div>
@@ -85,7 +85,7 @@
     <!-- ================= MOVEMENT & SUMMARY VIEW ================= -->
     <div id="viewMovement" class="space-y-4 hidden">
       <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-3">
-        <h2 class="font-bold text-base text-slate-800 border-b pb-2">📋 Round Movement & Summary Guide</h2>
+        <h2 class="font-bold base text-slate-800 border-b pb-2">📋 Round Movement & Table Verification Card</h2>
         <p class="text-xs text-slate-500">Check this summary card with your opponents before playing to verify board allocation, table moving directions, and seating rosters.</p>
         <div id="movementSummaryCard" class="space-y-3 pt-2">
           <!-- Dynamically populated summary card -->
@@ -116,10 +116,10 @@
           </div>
         </div>
 
-        <!-- Choose Board Movement System -->
-        <div class="space-y-1.5">
-          <label class="block font-semibold text-slate-700 text-xs">Select Board Movement / System:</label>
-          <select id="adminMovementSelect" onchange="updateAdminConfig()" class="w-full border rounded p-2 bg-slate-50 font-bold text-xs">
+        <!-- Movement Selection -->
+        <div class="space-y-1.5 text-xs">
+          <label class="block font-semibold text-slate-700">Select Board Movement / System:</label>
+          <select id="adminMovementSelect" onchange="updateAdminConfig()" class="w-full border rounded p-2 bg-slate-50 font-bold">
             <option value="StandardTeams">1. Standard Teams Match (Open/Closed - Fixed Boards)</option>
             <option value="SharedBoards">2. Shared Boards / Round Royale (Simultaneous play)</option>
             <option value="Mitchell">3. Mitchell Team Movement (NS stationary, EW shifting)</option>
@@ -127,6 +127,14 @@
             <option value="Swiss">5. Swiss Teams (Ranked pairing each round)</option>
             <option value="BAM">6. Board-a-Match (BAM Point scoring format)</option>
           </select>
+        </div>
+
+        <!-- Material & Board Set Preparation Guide -->
+        <div id="materialPrepBox" class="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs space-y-1.5">
+          <div class="font-bold text-amber-900">📦 Director Equipment & Board Set Guide:</div>
+          <div id="materialPrepContent" class="text-amber-800 space-y-1">
+            <!-- Dynamically populated preparation requirements -->
+          </div>
         </div>
 
         <!-- Cross Table IMP Matrix & Leaderboard -->
@@ -194,7 +202,7 @@
 
     const suits = ["♣", "♦", "♥", "♠", "NT"];
 
-    let globalState = JSON.parse(localStorage.getItem("bridge_v19_data") || "{}");
+    let globalState = JSON.parse(localStorage.getItem("bridge_v20_data") || "{}");
 
     function initRoom(room) {
       if (!globalState[room]) {
@@ -304,6 +312,20 @@
       document.getElementById('adminBoardsCount').value = cfg.boardsCount;
       document.getElementById('adminMovementSelect').value = cfg.movement;
 
+      // Material Prep Guide Calculation
+      const totalTeams = cfg.totalTeams;
+      const boardsPerMatch = cfg.boardsCount;
+      const tablesNeeded = Math.ceil(totalTeams / 2);
+      const hasBye = totalTeams % 2 !== 0;
+
+      let prepHTML = `
+        <div>• <b>Board Number Range:</b> Prepare boards numbered <b>1 to ${boardsPerMatch}</b>.</div>
+        <div>• <b>Tables Needed:</b> ${tablesNeeded} tables (${totalTeams} teams).</div>
+        <div>• <b>Spare Board Set:</b> ${totalTeams > 2 ? 'Yes, prepare 1 extra spare set for rotation.' : 'Not required for 2-team direct match.'}</div>
+        <div>• <b>BYE (Standby Team):</b> ${hasBye ? '<b>YES</b>, 1 team will have a bye each round.' : 'None (even number of teams).'}</div>
+      `;
+      document.getElementById('materialPrepContent').innerHTML = prepHTML;
+
       const tbody = document.getElementById('adminTableBody');
       tbody.innerHTML = `
         <tr>
@@ -323,38 +345,26 @@
       initRoom(currentRoom);
       const roomData = globalState[currentRoom];
       const cfg = roomData.config;
-      const tOpen = roomData.tables.Open;
-      const tClosed = roomData.tables.Closed;
+      const activeTable = roomData.tables[currentRoomType];
       const container = document.getElementById('movementSummaryCard');
-
-      let movementDesc = "";
-      if (cfg.movement === "StandardTeams") {
-        movementDesc = "Standard Open/Closed Match: Fixed table seating. Open Room and Closed Room play all boards concurrently.";
-      } else if (cfg.movement === "SharedBoards") {
-        movementDesc = "Shared Boards / Round Royale: Tables share identical sets of boards. Pass boards to the next table clockwise after completion.";
-      } else if (cfg.movement === "Mitchell") {
-        movementDesc = "Mitchell Movement: N/S pairs remain stationary; E/W pairs move up one table each round.";
-      } else if (cfg.movement === "Howell") {
-        movementDesc = "Howell Movement: All pairs rotate tables and directions according to standard Howell guide cards.";
-      } else if (cfg.movement === "Swiss") {
-        movementDesc = "Swiss Teams: Winners play winners based on running IMP standings updated after each round.";
-      } else {
-        movementDesc = "Board-a-Match (BAM): Each board is scored independently as a win, loss, or tie.";
-      }
 
       container.innerHTML = `
         <div class="bg-slate-50 p-3 rounded-lg border space-y-2 text-xs">
           <div class="font-bold text-slate-700">Selected System: <span class="text-blue-600">${cfg.movement}</span></div>
-          <div class="text-slate-600">${movementDesc}</div>
+          <div class="text-slate-600">Match configured for <b>${cfg.totalTeams} Teams</b> playing <b>${cfg.boardsCount} Boards</b> (Boards 1 - ${cfg.boardsCount}).</div>
+          
           <div class="border-t pt-2 space-y-1">
-            <div class="font-bold text-slate-800">Current Table (${currentRoomType} Room):</div>
-            <div>• <b>North:</b> ${roomData.tables[currentRoomType].N}</div>
-            <div>• <b>South:</b> ${roomData.tables[currentRoomType].S}</div>
-            <div>• <b>East (Opponent):</b> ${roomData.tables[currentRoomType].E}</div>
-            <div>• <b>West (Opponent):</b> ${roomData.tables[currentRoomType].W}</div>
+            <div class="font-bold text-slate-800">📍 Current Table: <span class="text-purple-600">${currentRoomType} Room</span></div>
+            <div>• <b>North (Home):</b> ${activeTable.N}</div>
+            <div>• <b>South (Home):</b> ${activeTable.S}</div>
+            <div>• <b>East (Opponent):</b> ${activeTable.E}</div>
+            <div>• <b>West (Opponent):</b> ${activeTable.W}</div>
           </div>
-          <div class="border-t pt-2 text-[11px] text-amber-700 bg-amber-50 p-2 rounded">
-            👉 <b>Movement Instruction:</b> Play Boards 1 to ${cfg.boardsCount}. After completion, pass boards toward the <b>East direction</b> or verify with the Director before shifting tables.
+
+          <div class="border-t pt-2 text-[11px] text-amber-700 bg-amber-50 p-2 rounded space-y-1">
+            <div>👉 <b>Movement Instruction:</b></div>
+            <div>• Play Boards 1 to ${cfg.boardsCount}.</div>
+            <div>• After completion, pass boards towards the <b>East direction</b> or shift tables as directed by the Movement protocol.</div>
           </div>
         </div>
       `;
@@ -505,7 +515,7 @@
     }
 
     function saveAndRefresh() {
-      localStorage.setItem("bridge_v19_data", JSON.stringify(globalState));
+      localStorage.setItem("bridge_v20_data", JSON.stringify(globalState));
       renderAll();
     }
 
@@ -516,9 +526,12 @@
       const openT = roomData.tables.Open;
       const closedT = roomData.tables.Closed;
       document.getElementById('rosterBannerContent').innerHTML = `
-        <span class="font-semibold text-blue-400">Open Table (N/S: ${openT.N} & ${openT.S} | E/W: ${openT.E} & ${openT.W})</span>
-        <span class="text-slate-500">|</span>
-        <span class="font-semibold text-red-400">Closed Table (N/S: ${closedT.N} & ${closedT.S} | E/W: ${closedT.E} & ${closedT.W})</span>
+        <div class="flex justify-between items-center w-full font-bold">
+          <span class="text-blue-400">Open Table: N/S (${openT.N}, ${openT.S}) vs E/W (${openT.E}, ${openT.W})</span>
+        </div>
+        <div class="flex justify-between items-center w-full font-bold">
+          <span class="text-red-400">Closed Table: N/S (${closedT.N}, ${closedT.S}) vs E/W (${closedT.E}, ${closedT.W})</span>
+        </div>
       `;
 
       const container = document.getElementById('boardsList');
