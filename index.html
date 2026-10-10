@@ -124,36 +124,6 @@
           </div>
         </div>
 
-        <div id="matchEditorContainer" class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-xs space-y-3">
-          <div class="font-bold text-blue-900 flex justify-between items-center">
-            <span>⚙️ Edit Active Match Settings: <span id="editingMatchTitle" class="text-indigo-700 underline">None</span></span>
-            <span id="matchStateBadge" class="px-2 py-0.5 rounded font-bold bg-gray-200 text-gray-700">CLOSED</span>
-          </div>
-          <div class="grid grid-cols-3 gap-2">
-            <div>
-              <label class="block font-semibold text-slate-600 mb-1">Teams:</label>
-              <select id="editTeams" onchange="updateSelectedMatchConfig()" class="w-full border rounded p-1 bg-white font-bold">
-                <option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option>
-              </select>
-            </div>
-            <div>
-              <label class="block font-semibold text-slate-600 mb-1">Boards/Rd:</label>
-              <input type="number" id="editBoards" min="1" max="24" onchange="updateSelectedMatchConfig()" class="w-full border rounded p-1 bg-white font-bold">
-            </div>
-            <div>
-              <label class="block font-semibold text-slate-600 mb-1">Movement:</label>
-              <select id="editMovement" onchange="updateSelectedMatchConfig()" class="w-full border rounded p-1 bg-white font-bold">
-                <option value="RoundRobin">Round Robin</option>
-                <option value="Mitchell">Mitchell</option>
-                <option value="Swiss">Swiss</option>
-                <option value="Howell">Howell</option>
-                <option value="BAM">BAM</option>
-                <option value="SharedBoards">Shared Boards</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
         <div class="border-t pt-3 space-y-2">
           <h3 class="font-bold text-xs text-slate-700">Tournament Results & VP Standings</h3>
           <div class="bg-slate-50 p-3 rounded-lg border space-y-2 text-xs">
@@ -233,7 +203,6 @@
   </div>
 
   <script>
-    // 1. 資料初始化
     let db = JSON.parse(localStorage.getItem("bridge_app_db") || "null");
     if (!db || !db.matches || typeof db.matches !== 'object') {
       db = { matches: {}, currentMatch: "" };
@@ -278,7 +247,6 @@
       }
     }
 
-    // 2. 下拉選單邏輯
     function refreshMatchDropdowns() {
       const select = document.getElementById('matchDropdownSelect');
       if (!select) return;
@@ -334,7 +302,6 @@
       openSeatingModal();
     }
 
-    // 3. View 切換控制
     function switchView(view) {
       document.getElementById('viewScoring').classList.add('hidden');
       document.getElementById('viewMovement').classList.add('hidden');
@@ -376,13 +343,21 @@
       }
     }
 
-    // 4. Movement Summary & 確認
     function toggleTeamConfirmation(side) {
       if (!db.currentMatch || !currentTableKey) return;
       let m = db.matches[db.currentMatch];
       if (!m.confirmations[currentTableKey]) m.confirmations[currentTableKey] = { ns: false, ew: false };
       m.confirmations[currentTableKey][side] = !m.confirmations[currentTableKey][side];
       saveAndRefresh();
+    }
+
+    function proceedToNextRound() {
+      if (!db.currentMatch || !currentTableKey) return;
+      let m = db.matches[db.currentMatch];
+      // 重置確認狀態以便下一輪使用
+      m.confirmations[currentTableKey] = { ns: false, ew: false };
+      saveAndRefresh();
+      switchView('scoring');
     }
 
     function renderMovementSummary() {
@@ -392,6 +367,7 @@
         return;
       }
       const m = db.matches[db.currentMatch];
+      const activeTable = m.tables[currentTableKey] || { N: '', S: '', E: '', W: '' };
       const tableScores = m.scores[currentTableKey] || [];
       const conf = m.confirmations[currentTableKey] || { ns: false, ew: false };
       const allConfirmed = conf.ns && conf.ew;
@@ -422,18 +398,21 @@
             <button onclick="toggleTeamConfirmation('ew')" class="py-2 rounded font-bold border text-xs ${conf.ew ? 'bg-emerald-600 text-white' : 'bg-white text-slate-700'}">${conf.ew ? '✅ E/W Confirmed' : '👉 Confirm E/W'}</button>
           </div>
           ${allConfirmed ? `
-            <div class="p-3 bg-emerald-50 border border-emerald-300 rounded-lg text-xs space-y-1 mt-2">
+            <div class="p-3 bg-emerald-50 border border-emerald-300 rounded-lg text-xs space-y-2 mt-2">
               <div class="font-bold text-emerald-900">✅ Confirmed! Next Round Instructions:</div>
               <div>📦 Pass Boards to <b>Table ${prevTable}</b></div>
-              <div>👥 N/S: <b class="text-blue-700">STATIONARY</b> (Stay at ${currentTableKey})</div>
-              <div>🏃 E/W: Move to <b class="text-indigo-700">Table ${nextTable}</b></div>
+              <div>👥 N/S (${activeTable.N \vert{}\vert{} 'North'} /${activeTable.S || 'South'}): <b class="text-blue-700">STATIONARY</b> (Stay at ${currentTableKey})</div>
+              <div>🏃 E/W (${activeTable.E \vert{}\vert{} 'East'} /${activeTable.W || 'West'}): Move to <b class="text-indigo-700">Table ${nextTable}</b></div>
+              
+              <button onclick="proceedToNextRound()" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded text-xs shadow-sm">
+                ➡️ Next Round (Return to Scoring)
+              </button>
             </div>
           ` : '<div class="p-2 bg-amber-50 text-amber-800 rounded border text-center font-bold">🔒 Both teams must confirm to unlock movement instructions.</div>'}
         </div>
       `;
     }
 
-    // 5. Admin 功能
     function createMatchByAdmin() {
       let name = document.getElementById('newMatchNameInput').value.trim();
       if (!name) return alert("Enter match name");
@@ -472,7 +451,6 @@
       document.getElementById('adminTableBody').innerHTML = html;
     }
 
-    // 6. Scoring 評分與輔助
     function confirmScore(idx) {
       if (!db.currentMatch || !currentTableKey) return;
       db.matches[db.currentMatch].scores[currentTableKey][idx].scoring.status = 'confirmed';
@@ -504,7 +482,7 @@
       let sc = db.matches[db.currentMatch].scores[currentTableKey][idx].scoring;
       if (sc.status === 'confirmed') return;
       sc.result = resVal.toString();
-      sc.score = (parseInt(sc.level) * 30) + (parseInt(resVal) * 20); // 簡化計分預覽
+      sc.score = (parseInt(sc.level) * 30) + (parseInt(resVal) * 20);
       sc.status = 'pending';
       saveAndRefresh();
     }
@@ -534,12 +512,28 @@
     }
 
     function renderAll() {
+      const bannerEl = document.getElementById('globalRosterBanner');
       const container = document.getElementById('boardsList');
       if (!container || !db.currentMatch || !currentTableKey) {
+        if (bannerEl) bannerEl.innerHTML = `<div class="max-w-xl mx-auto font-bold text-amber-300">⚠️ Please select Match and Active Table above.</div>`;
         if (container) container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-500 text-sm">Select Match & Table, then click Join Match.</div>`;
         return;
       }
-      let tableScores = db.matches[db.currentMatch].scores[currentTableKey] || [];
+
+      const m = db.matches[db.currentMatch];
+      const activeTable = m.tables[currentTableKey] || { N: '', S: '', E: '', W: '' };
+
+      bannerEl.innerHTML = `
+        <div class="max-w-xl mx-auto flex flex-col gap-0.5 text-xs font-bold">
+          <div class="text-yellow-300">Match: ${db.currentMatch} | Table: ${currentTableKey}</div>
+          <div class="text-slate-100 flex justify-between">
+            <span>⬆️ N: ${activeTable.N || '-'} | ⬇️ S: ${activeTable.S || '-'}</span>
+            <span>⬅️ W: ${activeTable.W || '-'} | ➡️ E: ${activeTable.E || '-'}</span>
+          </div>
+        </div>
+      `;
+
+      let tableScores = m.scores[currentTableKey] || [];
       container.innerHTML = '';
       tableScores.forEach((b, idx) => {
         let sc = b.scoring;
@@ -549,7 +543,7 @@
         card.innerHTML = `
           <div class="font-bold text-base border-b pb-1">Board ${b.boardNum} (Vul: ${b.vul})</div>
           <div class="grid grid-cols-5 gap-1">${suits.map(s => `<button ${isLocked ? 'disabled' : ''} onclick="selectContract(${idx}, 4, '${s}')" class="contract-btn ${sc.suit===s?'selected':''}">${s}</button>`).join('')}</div>
-          <div class="flex gap-1 border-t pt-2">${['N','S','E','W'].map(d => `<button ${isLocked ? 'disabled' : ''} onclick="selectDeclarer(${idx}, '${d}')" class="step-btn flex-1 ${sc.declarer===d?'selected':''}">${d}</button>`).join('')}</div>
+          <div class="flex gap-1 border-t pt-2">${['N','S','E','W'].map(d => `<button ${isLocked ? 'disabled' : ''} onclick="selectDeclarer(${idx}, '${d}')" class="step-btn flex-1 ${sc.declarer===d?'selected':''}">${d} (${activeTable[d] || d})</button>`).join('')}</div>
           <div class="flex gap-1 border-t pt-2"><button onclick="selectDouble(${idx}, 'NONE')" class="step-btn flex-1">None</button><button onclick="selectDouble(${idx}, 'X')" class="step-btn flex-1">X</button></div>
           <div class="flex gap-1 border-t pt-2"><button onclick="selectResult(${idx}, '0')" class="res-btn flex-1">=</button><button onclick="selectResult(${idx}, '1')" class="res-btn flex-1">+1</button><button onclick="selectResult(${idx}, '-1')" class="res-btn flex-1">-1</button></div>
           <div class="flex justify-between items-center border-t pt-2 text-xs">
@@ -561,7 +555,6 @@
       });
     }
 
-    // 啟動
     initMatchStructure(db.currentMatch);
     refreshMatchDropdowns();
   </script>
