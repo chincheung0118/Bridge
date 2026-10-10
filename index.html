@@ -7,7 +7,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    .vul-active { background-color: #ef4444 !important; color: #ffffff !important; font-weight: bold; }
     .contract-btn { font-size: 11px; padding: 6px 2px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 700; background-color: #f8fafc; }
     .contract-btn.selected { background-color: #2563eb !important; color: #ffffff !important; border-color: #1d4ed8 !important; }
     .step-btn { padding: 8px 4px; border-radius: 8px; font-weight: 700; border: 1px solid #cbd5e1; background-color: #f8fafc; text-align: center; font-size: 11px; }
@@ -38,7 +37,7 @@
 
   <main class="max-w-xl mx-auto p-4 space-y-4">
 
-    <!-- ================= SCORING VIEW ================= -->
+    <!-- SCORING VIEW -->
     <div id="viewScoring" class="space-y-4">
       <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-3">
         <h2 class="font-bold text-sm text-slate-600">1. Select Match & Table Setup</h2>
@@ -65,7 +64,7 @@
       <div class="space-y-3" id="boardsList"></div>
     </div>
 
-    <!-- ================= MOVEMENT VIEW ================= -->
+    <!-- MOVEMENT VIEW -->
     <div id="viewMovement" class="space-y-4 hidden">
       <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-3">
         <h2 class="font-bold text-base text-slate-800 border-b pb-2">📋 Movement & Round Verification Guide</h2>
@@ -73,7 +72,7 @@
       </div>
     </div>
 
-    <!-- ================= ADMIN VIEW ================= -->
+    <!-- ADMIN VIEW -->
     <div id="viewAdmin" class="space-y-4 hidden">
       <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-4">
         <div class="flex justify-between items-center border-b pb-2">
@@ -86,7 +85,7 @@
           <div class="space-y-2">
             <div>
               <label class="block font-semibold text-slate-600 mb-1">1. Match Name:</label>
-              <input type="text" id="newMatchNameInput" placeholder="e.g. Match 1 / Final Round 1" class="w-full border rounded px-2 py-1.5 text-xs bg-white font-bold">
+              <input type="text" id="newMatchNameInput" placeholder="e.g. Match 1" class="w-full border rounded px-2 py-1.5 text-xs bg-white font-bold">
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
@@ -153,18 +152,10 @@
               </select>
             </div>
           </div>
-          <div id="editLockedWarning" class="text-amber-800 font-semibold italic hidden">🔒 This match is currently OPEN. Switch to CLOSED to modify settings.</div>
-        </div>
-
-        <div class="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs space-y-2">
-          <div class="font-bold text-amber-900">📦 TD Board Placement & Standby Guide:</div>
-          <div id="materialPrepContent" class="text-amber-800 space-y-1"></div>
         </div>
 
         <div class="border-t pt-3 space-y-2">
-          <div class="flex justify-between items-center mb-2">
-            <h3 class="font-bold text-xs text-slate-700">Tournament Results & VP Standings</h3>
-          </div>
+          <h3 class="font-bold text-xs text-slate-700">Tournament Results & VP Standings</h3>
           <div class="bg-slate-50 p-3 rounded-lg border space-y-2 text-xs">
             <label class="block font-bold text-slate-700">Select Match to Generate Result:</label>
             <div class="flex gap-2">
@@ -200,7 +191,7 @@
     <div class="bg-white rounded-xl max-w-sm w-full p-4 space-y-3 shadow-xl">
       <h3 class="font-bold text-sm text-slate-800">🔒 Tournament Director Password Required</h3>
       <p class="text-xs text-slate-500">Please enter the TD password to access Admin & VP panel.</p>
-      <input type="password" id="adminPasswordInput" placeholder="Enter TD Password" autocomplete="current-password" class="w-full border rounded p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <input type="password" id="adminPasswordInput" placeholder="Enter TD Password" class="w-full border rounded p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
       <div class="flex gap-2 pt-2">
         <button onclick="closePasswordModal()" class="flex-1 bg-slate-200 text-slate-700 font-bold py-2 rounded text-xs">Cancel</button>
         <button onclick="verifyAdminPassword()" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded text-xs">Login</button>
@@ -213,33 +204,27 @@
     <div class="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl">
       <div class="flex justify-between items-center border-b pb-2">
         <h3 class="font-bold text-sm text-slate-800" id="seatingModalTitle">🧭 Compass Seating Layout</h3>
-        <span id="seatingTableAffiliation" class="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">Table Affiliation</span>
       </div>
-      <p class="text-[11px] text-slate-500">Enter player names below. Click suggestions from teammates to avoid typo errors.</p>
-      
       <div class="relative bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col items-center gap-3">
         <div class="w-48 text-center">
-          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">⬆️ North (<span id="labelTeamN">Team 1</span>)</label>
-          <input type="text" id="inputNorth" list="teammateList" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">⬆️ North</label>
+          <input type="text" id="inputNorth" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
         </div>
         <div class="flex justify-between w-full gap-4">
           <div class="w-40 text-left">
-            <label class="block text-[11px] font-bold text-slate-700 mb-0.5">⬅️ West (<span id="labelTeamW">Opponent</span>)</label>
-            <input type="text" id="inputWest" list="teammateList" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
+            <label class="block text-[11px] font-bold text-slate-700 mb-0.5">⬅️ West</label>
+            <input type="text" id="inputWest" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
           </div>
           <div class="w-40 text-right">
-            <label class="block text-[11px] font-bold text-slate-700 mb-0.5">➡️ East (<span id="labelTeamE">Opponent</span>)</label>
-            <input type="text" id="inputEast" list="teammateList" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
+            <label class="block text-[11px] font-bold text-slate-700 mb-0.5">➡️ East</label>
+            <input type="text" id="inputEast" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
           </div>
         </div>
         <div class="w-48 text-center">
-          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">⬇️ South (<span id="labelTeamS">Team 1</span>)</label>
-          <input type="text" id="inputSouth" list="teammateList" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">⬇️ South</label>
+          <input type="text" id="inputSouth" class="w-full border rounded p-1.5 text-xs bg-white font-bold text-center" placeholder="Player Name">
         </div>
       </div>
-
-      <datalist id="teammateList"></datalist>
-
       <div class="flex gap-2 pt-1">
         <button onclick="closeSeatingModal()" class="flex-1 bg-slate-200 text-slate-700 font-bold py-2 rounded text-xs">Cancel</button>
         <button onclick="saveSeatingModal()" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded text-xs">Save Seating</button>
@@ -248,13 +233,337 @@
   </div>
 
   <script>
+    // 1. 資料初始化
     let db = JSON.parse(localStorage.getItem("bridge_app_db") || "null");
-
     if (!db || !db.matches || typeof db.matches !== 'object') {
       db = { matches: {}, currentMatch: "" };
     }
-
     if (!db.matches["Match 1"]) {
       db.matches["Match 1"] = { 
         status: "open", 
-        config: { totalTeams: 3, boardsCount: 3, movement: "RoundRobin
+        config: { totalTeams: 3, boardsCount: 3, movement: "RoundRobin" }, 
+        tables: {}, 
+        scores: {},
+        confirmations: {} 
+      };
+    }
+    let allKeys = Object.keys(db.matches);
+    if (!db.currentMatch || !db.matches[db.currentMatch]) {
+      db.currentMatch = allKeys[0];
+    }
+    let currentTableKey = "";
+    const defaultVulSchedule = ["None", "N-S", "E-W", "All", "N-S", "E-W", "All", "None", "E-W", "All", "None", "N-S", "All", "None", "N-S", "E-W"];
+    const suits = ["♣", "♦", "♥", "♠", "NT"];
+
+    function initMatchStructure(matchName) {
+      if (!matchName || !db.matches[matchName]) return;
+      let m = db.matches[matchName];
+      if (!m.config) m.config = { totalTeams: 3, boardsCount: 3, movement: "RoundRobin" };
+      if (!m.tables) m.tables = {};
+      if (!m.scores) m.scores = {};
+      if (!m.confirmations) m.confirmations = {};
+      
+      for (let i = 1; i <= m.config.totalTeams; i++) {
+        let tKey = `Table${i}`;
+        if (!m.tables[tKey]) m.tables[tKey] = { N: '', S: '', E: '', W: '' };
+        if (!m.scores[tKey] || m.scores[tKey].length !== m.config.boardsCount) {
+          let startB = ((i - 1) * m.config.boardsCount) + 1;
+          m.scores[tKey] = Array.from({ length: m.config.boardsCount }, (_, idx) => ({
+            boardNum: startB + idx,
+            vul: defaultVulSchedule[(startB + idx - 1) % 16],
+            scoring: { level: "", suit: "", declarer: "", dbl: "", result: "", score: null, status: "draft" }
+          }));
+        }
+        if (!m.confirmations[tKey]) m.confirmations[tKey] = { ns: false, ew: false };
+      }
+    }
+
+    // 2. 下拉選單邏輯
+    function refreshMatchDropdowns() {
+      const select = document.getElementById('matchDropdownSelect');
+      if (!select) return;
+      select.innerHTML = '<option value="">-- Select Match --</option>';
+      Object.keys(db.matches).forEach(mName => {
+        let opt = document.createElement('option');
+        opt.value = mName;
+        opt.innerText = `${mName} (${(db.matches[mName].status || 'open').toUpperCase()})`;
+        if (mName === db.currentMatch) opt.selected = true;
+        select.appendChild(opt);
+      });
+      updateTableDropdownState();
+    }
+
+    function updateTableDropdownState() {
+      const select = document.getElementById('roomTypeSelect');
+      const joinBtn = document.getElementById('btnJoinMatch');
+      if (!select) return;
+      
+      if (!db.currentMatch || !db.matches[db.currentMatch]) {
+        select.innerHTML = '<option value="">-- Please Select Match First --</option>';
+        select.disabled = true;
+        if (joinBtn) joinBtn.disabled = true;
+        return;
+      }
+      select.disabled = false;
+      select.innerHTML = '<option value="">-- Select Active Table --</option>';
+      let m = db.matches[db.currentMatch];
+      for (let i = 1; i <= m.config.totalTeams; i++) {
+        let tKey = `Table${i}`;
+        let opt = document.createElement('option');
+        opt.value = tKey;
+        opt.innerText = `Table ${i}`;
+        if (tKey === currentTableKey) opt.selected = true;
+        select.appendChild(opt);
+      }
+      if (joinBtn) joinBtn.disabled = !(select.value);
+    }
+
+    function onMatchDropdownChange() {
+      db.currentMatch = document.getElementById('matchDropdownSelect').value;
+      currentTableKey = "";
+      saveAndRefresh();
+    }
+
+    function onTableDropdownChange() {
+      currentTableKey = document.getElementById('roomTypeSelect').value;
+      document.getElementById('btnJoinMatch').disabled = !currentTableKey;
+      saveAndRefresh();
+    }
+
+    function joinSelectedMatch() {
+      openSeatingModal();
+    }
+
+    // 3. View 切換控制
+    function switchView(view) {
+      document.getElementById('viewScoring').classList.add('hidden');
+      document.getElementById('viewMovement').classList.add('hidden');
+      document.getElementById('viewAdmin').classList.add('hidden');
+      
+      document.getElementById('btnViewScoring').className = "text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded font-bold";
+      document.getElementById('btnViewMovement').className = "text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded font-bold";
+      document.getElementById('btnViewAdmin').className = "text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded font-bold";
+
+      if (view === 'scoring') {
+        document.getElementById('viewScoring').classList.remove('hidden');
+        document.getElementById('btnViewScoring').className = "text-xs bg-blue-600 px-3 py-1 rounded font-bold";
+        renderAll();
+      } else if (view === 'movement') {
+        document.getElementById('viewMovement').classList.remove('hidden');
+        document.getElementById('btnViewMovement').className = "text-xs bg-blue-600 px-3 py-1 rounded font-bold";
+        renderMovementSummary();
+      } else if (view === 'admin') {
+        document.getElementById('viewAdmin').classList.remove('hidden');
+        document.getElementById('btnViewAdmin').className = "text-xs bg-blue-600 px-3 py-1 rounded font-bold";
+        renderAdminPanel();
+      }
+    }
+
+    function requestAdminAccess() {
+      document.getElementById('passwordModal').classList.remove('hidden');
+      document.getElementById('passwordModal').classList.add('flex');
+    }
+    function closePasswordModal() {
+      document.getElementById('passwordModal').classList.add('hidden');
+      document.getElementById('passwordModal').classList.remove('flex');
+    }
+    function verifyAdminPassword() {
+      if (document.getElementById('adminPasswordInput').value.trim() === "Grandslam") {
+        closePasswordModal();
+        switchView('admin');
+      } else {
+        alert("Incorrect Password!");
+      }
+    }
+
+    // 4. Movement Summary & 確認
+    function toggleTeamConfirmation(side) {
+      if (!db.currentMatch || !currentTableKey) return;
+      let m = db.matches[db.currentMatch];
+      if (!m.confirmations[currentTableKey]) m.confirmations[currentTableKey] = { ns: false, ew: false };
+      m.confirmations[currentTableKey][side] = !m.confirmations[currentTableKey][side];
+      saveAndRefresh();
+    }
+
+    function renderMovementSummary() {
+      const container = document.getElementById('movementSummaryCard');
+      if (!container || !db.currentMatch || !currentTableKey) {
+        if (container) container.innerHTML = `<div class="text-xs text-slate-400 p-3">Please select Match and Table in Scoring page first.</div>`;
+        return;
+      }
+      const m = db.matches[db.currentMatch];
+      const tableScores = m.scores[currentTableKey] || [];
+      const conf = m.confirmations[currentTableKey] || { ns: false, ew: false };
+      const allConfirmed = conf.ns && conf.ew;
+
+      let tableNum = parseInt(currentTableKey.replace('Table', ''));
+      let nextTable = tableNum < m.config.totalTeams ? tableNum + 1 : 1;
+      let prevTable = tableNum > 1 ? tableNum - 1 : m.config.totalTeams;
+
+      let rows = tableScores.map(b => `
+        <tr class="border-b text-center">
+          <td class="p-2 font-bold">Board ${b.boardNum}</td>
+          <td class="p-2 text-blue-600 font-bold">${b.scoring.level ? b.scoring.level + b.scoring.suit : '-'}</td>
+          <td class="p-2">${b.scoring.declarer || '-'}</td>
+          <td class="p-2">${b.scoring.result || '-'}</td>
+          <td class="p-2 font-black">${b.scoring.score !== null ? b.scoring.score : '-'}</td>
+        </tr>
+      `).join('');
+
+      container.innerHTML = `
+        <div class="bg-slate-50 p-3 rounded-lg border space-y-3 text-xs">
+          <div class="font-bold border-b pb-1">Summary for <b>${currentTableKey}</b> (${db.currentMatch})</div>
+          <table class="w-full text-xs border bg-white">
+            <tr class="bg-slate-100 font-semibold border-b"><th class="p-1">Board</th><th class="p-1">Contract</th><th class="p-1">Declarer</th><th class="p-1">Result</th><th class="p-1">Score</th></tr>
+            ${rows}
+          </table>
+          <div class="grid grid-cols-2 gap-2 pt-2">
+            <button onclick="toggleTeamConfirmation('ns')" class="py-2 rounded font-bold border text-xs ${conf.ns ? 'bg-emerald-600 text-white' : 'bg-white text-slate-700'}">${conf.ns ? '✅ N/S Confirmed' : '👉 Confirm N/S'}</button>
+            <button onclick="toggleTeamConfirmation('ew')" class="py-2 rounded font-bold border text-xs ${conf.ew ? 'bg-emerald-600 text-white' : 'bg-white text-slate-700'}">${conf.ew ? '✅ E/W Confirmed' : '👉 Confirm E/W'}</button>
+          </div>
+          ${allConfirmed ? `
+            <div class="p-3 bg-emerald-50 border border-emerald-300 rounded-lg text-xs space-y-1 mt-2">
+              <div class="font-bold text-emerald-900">✅ Confirmed! Next Round Instructions:</div>
+              <div>📦 Pass Boards to <b>Table ${prevTable}</b></div>
+              <div>👥 N/S: <b class="text-blue-700">STATIONARY</b> (Stay at ${currentTableKey})</div>
+              <div>🏃 E/W: Move to <b class="text-indigo-700">Table ${nextTable}</b></div>
+            </div>
+          ` : '<div class="p-2 bg-amber-50 text-amber-800 rounded border text-center font-bold">🔒 Both teams must confirm to unlock movement instructions.</div>'}
+        </div>
+      `;
+    }
+
+    // 5. Admin 功能
+    function createMatchByAdmin() {
+      let name = document.getElementById('newMatchNameInput').value.trim();
+      if (!name) return alert("Enter match name");
+      db.matches[name] = {
+        status: "open",
+        config: { totalTeams: parseInt(document.getElementById('newMatchTeams').value), boardsCount: parseInt(document.getElementById('newMatchBoards').value), movement: document.getElementById('newMatchMovement').value },
+        tables: {}, scores: {}, confirmations: {}
+      };
+      db.currentMatch = name;
+      saveAndRefresh();
+    }
+
+    function renderAdminPanel() {
+      let select = document.getElementById('adminResultMatchSelect');
+      if (select) {
+        select.innerHTML = '';
+        Object.keys(db.matches).forEach(m => {
+          let opt = document.createElement('option');
+          opt.value = m; opt.innerText = m;
+          select.appendChild(opt);
+        });
+      }
+      renderAdminStandingsForSelectedMatch();
+    }
+
+    function renderAdminStandingsForSelectedMatch() {
+      let target = document.getElementById('adminResultMatchSelect').value || db.currentMatch;
+      if (!target || !db.matches[target]) return;
+      let m = db.matches[target];
+      let html = "";
+      for (let i = 1; i <= m.config.totalTeams; i++) {
+        let tScores = m.scores[`Table${i}`] || [];
+        let totalImp = tScores.reduce((acc, cur) => acc + (cur.scoring.score || 0), 0);
+        html += `<tr class="border-b"><td class="p-2 font-bold">Team ${i}</td><td class="p-2 text-blue-600 font-bold">${totalImp} IMPs</td><td class="p-2 font-black">${(10 + totalImp/10).toFixed(2)} VP</td><td class="p-2 text-green-600 font-bold">${m.status.toUpperCase()}</td></tr>`;
+      }
+      document.getElementById('adminTableBody').innerHTML = html;
+    }
+
+    // 6. Scoring 評分與輔助
+    function confirmScore(idx) {
+      if (!db.currentMatch || !currentTableKey) return;
+      db.matches[db.currentMatch].scores[currentTableKey][idx].scoring.status = 'confirmed';
+      saveAndRefresh();
+      
+      let allDone = db.matches[db.currentMatch].scores[currentTableKey].every(b => b.scoring.status === 'confirmed');
+      if (allDone) switchView('movement');
+    }
+
+    function selectContract(idx, lvl, suit) {
+      let sc = db.matches[db.currentMatch].scores[currentTableKey][idx].scoring;
+      if (sc.status === 'confirmed') return;
+      sc.level = lvl.toString(); sc.suit = suit;
+      saveAndRefresh();
+    }
+    function selectDeclarer(idx, dir) {
+      let sc = db.matches[db.currentMatch].scores[currentTableKey][idx].scoring;
+      if (sc.status === 'confirmed') return;
+      sc.declarer = dir;
+      saveAndRefresh();
+    }
+    function selectDouble(idx, dblVal) {
+      let sc = db.matches[db.currentMatch].scores[currentTableKey][idx].scoring;
+      if (sc.status === 'confirmed') return;
+      sc.dbl = dblVal;
+      saveAndRefresh();
+    }
+    function selectResult(idx, resVal) {
+      let sc = db.matches[db.currentMatch].scores[currentTableKey][idx].scoring;
+      if (sc.status === 'confirmed') return;
+      sc.result = resVal.toString();
+      sc.score = (parseInt(sc.level) * 30) + (parseInt(resVal) * 20); // 簡化計分預覽
+      sc.status = 'pending';
+      saveAndRefresh();
+    }
+
+    function openSeatingModal() { document.getElementById('seatingModal').classList.remove('hidden'); document.getElementById('seatingModal').classList.add('flex'); }
+    function closeSeatingModal() { document.getElementById('seatingModal').classList.add('hidden'); document.getElementById('seatingModal').classList.remove('flex'); }
+    function saveSeatingModal() {
+      if (!db.currentMatch || !currentTableKey) return;
+      db.matches[db.currentMatch].tables[currentTableKey] = {
+        N: document.getElementById('inputNorth').value.trim(),
+        S: document.getElementById('inputSouth').value.trim(),
+        E: document.getElementById('inputEast').value.trim(),
+        W: document.getElementById('inputWest').value.trim()
+      };
+      closeSeatingModal();
+      saveAndRefresh();
+    }
+
+    function saveDB() { localStorage.setItem("bridge_app_db", JSON.stringify(db)); }
+    function saveAndRefresh() {
+      saveDB();
+      initMatchStructure(db.currentMatch);
+      refreshMatchDropdowns();
+      renderAll();
+      if (!document.getElementById('viewMovement').classList.contains('hidden')) renderMovementSummary();
+      if (!document.getElementById('viewAdmin').classList.contains('hidden')) renderAdminPanel();
+    }
+
+    function renderAll() {
+      const container = document.getElementById('boardsList');
+      if (!container || !db.currentMatch || !currentTableKey) {
+        if (container) container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-500 text-sm">Select Match & Table, then click Join Match.</div>`;
+        return;
+      }
+      let tableScores = db.matches[db.currentMatch].scores[currentTableKey] || [];
+      container.innerHTML = '';
+      tableScores.forEach((b, idx) => {
+        let sc = b.scoring;
+        let isLocked = sc.status === 'confirmed';
+        let card = document.createElement('div');
+        card.className = "bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-2";
+        card.innerHTML = `
+          <div class="font-bold text-base border-b pb-1">Board ${b.boardNum} (Vul: ${b.vul})</div>
+          <div class="grid grid-cols-5 gap-1">${suits.map(s => `<button ${isLocked ? 'disabled' : ''} onclick="selectContract(${idx}, 4, '${s}')" class="contract-btn ${sc.suit===s?'selected':''}">${s}</button>`).join('')}</div>
+          <div class="flex gap-1 border-t pt-2">${['N','S','E','W'].map(d => `<button ${isLocked ? 'disabled' : ''} onclick="selectDeclarer(${idx}, '${d}')" class="step-btn flex-1 ${sc.declarer===d?'selected':''}">${d}</button>`).join('')}</div>
+          <div class="flex gap-1 border-t pt-2"><button onclick="selectDouble(${idx}, 'NONE')" class="step-btn flex-1">None</button><button onclick="selectDouble(${idx}, 'X')" class="step-btn flex-1">X</button></div>
+          <div class="flex gap-1 border-t pt-2"><button onclick="selectResult(${idx}, '0')" class="res-btn flex-1">=</button><button onclick="selectResult(${idx}, '1')" class="res-btn flex-1">+1</button><button onclick="selectResult(${idx}, '-1')" class="res-btn flex-1">-1</button></div>
+          <div class="flex justify-between items-center border-t pt-2 text-xs">
+            <div>Contract: <b>${sc.level}${sc.suit}</b> by <b>${sc.declarer}</b> | Score: <b>${sc.score !== null ? sc.score : '-'}</b></div>
+            <button onclick="confirmScore(${idx})" class="bg-green-600 text-white font-bold px-3 py-1 rounded">✅ Confirm</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // 啟動
+    initMatchStructure(db.currentMatch);
+    refreshMatchDropdowns();
+  </script>
+</body>
+</html>
