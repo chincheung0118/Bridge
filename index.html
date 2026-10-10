@@ -283,4 +283,782 @@
 
     // 3. 確保當前 Match 指向有效鍵值
     let allMatchKeys = Object.keys(db.matches);
-    
+    let openKeys = allMatchKeys.filter(k => db.matches[k] && db.matches[k].status === 'open');
+
+    if (openKeys.length > 0) {
+      if (!db.currentMatch || !db.matches[db.currentMatch] || db.matches[db.currentMatch].status !== 'open') {
+        db.currentMatch = openKeys[0];
+      }
+    } else {
+      db.currentMatch = allMatchKeys[0];
+    }
+
+    let currentTableKey = "";
+
+    const defaultVulSchedule = [
+      "None", "N-S", "E-W", "All",
+      "N-S", "E-W", "All", "None",
+      "E-W", "All", "None", "N-S",
+      "All", "None", "N-S", "E-W"
+    ];
+
+    const suits = ["♣", "♦", "♥", "♠", "NT"];
+
+    function getActiveTablesCount(totalTeams) {
+      return totalTeams;
+    }
+
+    function initMatchStructure(matchName) {
+      if (!matchName || !db.matches[matchName]) return;
+      let m = db.matches[matchName];
+      if (!m.config) m.config = { totalTeams: 3, boardsCount: 3, movement: "RoundRobin" };
+      if (!m.tables) m.tables = {};
+      if (!m.scores) m.scores = {};
+      
+      let tCount = getActiveTablesCount(m.config.totalTeams);
+      for (let i = 1; i <= tCount; i++) {
+        let tKey = `Table${i}`;
+        if (!m.tables[tKey]) {
+          m.tables[tKey] = { N: ``, S: ``, E: ``, W: `` };
+        }
+        if (!m.scores[tKey] || !Array.isArray(m.scores[tKey]) || m.scores[tKey].length !== m.config.boardsCount) {
+          m.scores[tKey] = generateBoardsArray(m.config.boardsCount, i);
+        }
+      }
+    }
+
+    function generateBoardsArray(boardsCount, tableIndex) {
+      let startBoard = ((tableIndex - 1) * boardsCount) + 1;
+      return Array.from({ length: boardsCount }, (_, idx) => {
+        let bNum = startBoard + idx;
+        return {
+          boardNum: bNum,
+          vul: defaultVulSchedule[(bNum - 1) % 16],
+          handRecordPhoto: null,
+          travelerPhoto: null,
+          scoring: { level: "", suit: "", declarer: "", dbl: "", result: "", score: null, status: "draft" }
+        };
+      });
+    }
+
+    function updateJoinButtonState() {
+      const matchSelect = document.getElementById('matchDropdownSelect');
+      const tableSelect = document.getElementById('roomTypeSelect');
+      const joinBtn = document.getElementById('btnJoinMatch');
+      if (!joinBtn) return;
+
+      if (matchSelect && tableSelect && matchSelect.value && tableSelect.value) {
+        joinBtn.disabled = false;
+      } else {
+        joinBtn.disabled = true;
+      }
+    }
+
+    // 4. 下拉選單邏輯：優先 open，無 open 則顯示全部分組
+    function refreshMatchDropdowns() {
+      const select = document.getElementById('matchDropdownSelect');
+      if (!select) return;
+
+      let allKeys = Object.keys(db.matches);
+      let openMatches = allKeys.filter(k => db.matches[k] && db.matches[k].status === 'open');
+      let targetList = openMatches.length > 0 ? openMatches : allKeys;
+
+      select.innerHTML = '<option value="">-- Select Match --</option>';
+      targetList.forEach(mName => {
+        let m = db.matches[mName];
+        let opt = document.createElement('option');
+        opt.value = mName;
+        opt.innerText = `${mName} (${(m.status || 'open').toUpperCase()})`;
+        if (mName === db.currentMatch) opt.selected = true;
+        select.appendChild(opt);
+      });
+
+      updateTableDropdownState();
+      updateJoinButtonState();
+    }
+
+    function onMatchDropdownChange() {
+      const matchSelect = document.getElementById('matchDropdownSelect');
+      const tableSelect = document.getElementById('roomTypeSelect');
+      
+      if (!matchSelect.value) {
+        db.currentMatch = "";
+        currentTableKey = "";
+        tableSelect.innerHTML = '<option value="">-- Please Select Match First --</option>';
+        tableSelect.disabled = true;
+        tableSelect.className = "w-full border rounded-lg px-3 py-2 text-sm bg-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed";
+        updateJoinButtonState();
+        saveDB();
+        renderAll();
+        return;
+      }
+
+      db.currentMatch = matchSelect.value;
+      initMatchStructure(db.currentMatch);
+      currentTableKey = "";
+      updateTableDropdownState();
+      updateJoinButtonState();
+      saveDB();
+      renderAll();
+    }
+
+    function updateTableDropdownState() {
+      const matchSelect = document.getElementById('matchDropdownSelect');
+      const tableSelect = document.getElementById('roomTypeSelect');
+      if (!tableSelect) return;
+
+      if (!matchSelect || !matchSelect.value || !db.matches[matchSelect.value]) {
+        tableSelect.innerHTML = '<option value="">-- Please Select Match First --</option>';
+        tableSelect.disabled = true;
+        tableSelect.className = "w-full border rounded-lg px-3 py-2 text-sm bg-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed";
+        updateJoinButtonState();
+        return;
+      }
+
+      tableSelect.disabled = false;
+      tableSelect.className = "w-full border rounded-lg px-3 py-2 text-sm bg-slate-50 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500";
+      
+      const m = db.matches[matchSelect.value];
+      const tCount = getActiveTablesCount(m.config.totalTeams);
+      tableSelect.innerHTML = '<option value="">-- Select Active Table --</option>';
+      for (let i = 1; i <= tCount; i++) {
+        let tKey = `Table${i}`;
+        let t = m.tables[tKey] || { N: '', S: '', E: '', W: '' };
+        let nsDesc = (t.N || t.S) ? `(${t.N || 'N'}/${t.S || 'S'})` : `(Team ${i})`;
+        let opt = document.createElement('option');
+        opt.value = tKey;
+        opt.innerText = `Table ${i} ${nsDesc}`;
+        if (tKey === currentTableKey) opt.selected = true;
+        tableSelect.appendChild(opt);
+      }
+      updateJoinButtonState();
+    }
+
+    function onTableDropdownChange() {
+      const tableSelect = document.getElementById('roomTypeSelect');
+      if (tableSelect && tableSelect.value) {
+        currentTableKey = tableSelect.value;
+        updateJoinButtonState();
+        saveDB();
+        renderAll();
+      }
+    }
+
+    function joinSelectedMatch() {
+      const matchSelect = document.getElementById('matchDropdownSelect');
+      const tableSelect = document.getElementById('roomTypeSelect');
+      
+      if (!matchSelect.value || !tableSelect.value) return;
+
+      db.currentMatch = matchSelect.value;
+      currentTableKey = tableSelect.value;
+      initMatchStructure(db.currentMatch);
+      saveDB();
+
+      openSeatingModal();
+    }
+
+    function createMatchByAdmin() {
+      const nameInput = document.getElementById('newMatchNameInput');
+      const name = nameInput.value.trim();
+      const teams = parseInt(document.getElementById('newMatchTeams').value);
+      const boards = parseInt(document.getElementById('newMatchBoards').value);
+      const movement = document.getElementById('newMatchMovement').value;
+
+      if (!name) return alert("Please enter a match name!");
+      if (db.matches[name]) return alert("Match name already exists!");
+
+      db.matches[name] = {
+        status: "open",
+        config: { totalTeams: teams, boardsCount: boards, movement: movement },
+        tables: {},
+        scores: {}
+      };
+      initMatchStructure(name);
+      nameInput.value = "";
+      db.currentMatch = name;
+      currentTableKey = "Table1";
+      saveAndRefresh();
+      renderAdminPanel();
+    }
+
+    function toggleMatchStatus(matchName) {
+      if (!db.matches[matchName]) return;
+      if (db.matches[matchName].status === 'open') {
+        let openCount = Object.keys(db.matches).filter(k => db.matches[k] && db.matches[k].status === 'open').length;
+        if (openCount <= 1) {
+          return alert("⚠️ Cannot close the last remaining open match! Please create or open another match first.");
+        }
+        db.matches[matchName].status = 'closed';
+        if (db.currentMatch === matchName) {
+          let openMatches = Object.keys(db.matches).filter(k => db.matches[k] && db.matches[k].status === 'open');
+          db.currentMatch = openMatches.length > 0 ? openMatches[0] : "";
+        }
+      } else {
+        db.matches[matchName].status = 'open';
+        db.currentMatch = matchName;
+      }
+      saveAndRefresh();
+      renderAdminPanel();
+    }
+
+    function deleteMatchByAdmin(matchName) {
+      if (!db.matches[matchName]) return;
+      if (db.matches[matchName].status === 'open') {
+        return alert("Cannot delete an OPEN match. Please close it first.");
+      }
+      if (confirm(`⚠️ RECONFIRM: Are you sure you want to permanently delete match '${matchName}'?`)) {
+        delete db.matches[matchName];
+        if (db.currentMatch === matchName) {
+          let openMatches = Object.keys(db.matches).filter(k => db.matches[k] && db.matches[k].status === 'open');
+          db.currentMatch = openMatches.length > 0 ? openMatches[0] : "";
+        }
+        saveAndRefresh();
+        renderAdminPanel();
+      }
+    }
+
+    function updateSelectedMatchConfig() {
+      if (!db.currentMatch || !db.matches[db.currentMatch]) return;
+      let m = db.matches[db.currentMatch];
+      if (m.status !== 'closed') return;
+
+      m.config.totalTeams = parseInt(document.getElementById('editTeams').value);
+      m.config.boardsCount = parseInt(document.getElementById('editBoards').value);
+      m.config.movement = document.getElementById('editMovement').value;
+
+      initMatchStructure(db.currentMatch);
+      updateTableDropdownState();
+      saveAndRefresh();
+    }
+
+    function requestAdminAccess() {
+      const modal = document.getElementById('passwordModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.getElementById('adminPasswordInput').value = '';
+      }
+    }
+
+    function closePasswordModal() {
+      const modal = document.getElementById('passwordModal');
+      if (modal) {
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+      }
+    }
+
+    function verifyAdminPassword() {
+      const pwd = document.getElementById('adminPasswordInput').value.trim();
+      if (pwd === "Grandslam") {
+        closePasswordModal();
+        switchView('admin');
+      } else {
+        alert("Incorrect Password!");
+      }
+    }
+
+    function switchView(view) {
+      ['viewScoring', 'viewMovement', 'viewAdmin'].forEach(v => {
+        const el = document.getElementById(v);
+        if (el) {
+          el.classList.add('hidden');
+          el.classList.remove('flex');
+        }
+      });
+      ['btnViewScoring', 'btnViewMovement', 'btnViewAdmin'].forEach(b => {
+        const btn = document.getElementById(b);
+        if (btn) btn.className = "text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded font-bold";
+      });
+
+      if (view === 'scoring') {
+        document.getElementById('viewScoring').classList.remove('hidden');
+        document.getElementById('btnViewScoring').className = "text-xs bg-blue-600 px-3 py-1 rounded font-bold";
+        renderAll();
+      } else if (view === 'movement') {
+        document.getElementById('viewMovement').classList.remove('hidden');
+        document.getElementById('btnViewMovement').className = "text-xs bg-blue-600 px-3 py-1 rounded font-bold";
+        renderMovementSummary();
+      } else if (view === 'admin') {
+        document.getElementById('viewAdmin').classList.remove('hidden');
+        document.getElementById('btnViewAdmin').className = "text-xs bg-blue-600 px-3 py-1 rounded font-bold";
+        renderAdminPanel();
+      }
+    }
+
+    function openSeatingModal() {
+      if (!db.currentMatch || !currentTableKey) return;
+      const m = db.matches[db.currentMatch];
+      const t = m.tables[currentTableKey] || { N: '', S: '', E: '', W: '' };
+      
+      let tableIndex = parseInt(currentTableKey.replace('Table', ''));
+      let nsTeam = `Team ${tableIndex}`;
+      let ewTeam = `Opponent / Team ${(tableIndex % m.config.totalTeams) + 1}`;
+
+      document.getElementById('seatingModalTitle').innerText = `🧭 Compass Seating for ${currentTableKey}`;
+      document.getElementById('seatingTableAffiliation').innerText = `${nsTeam} (NS) vs ${ewTeam} (EW)`;
+      document.getElementById('labelTeamN').innerText = nsTeam;
+      document.getElementById('labelTeamS').innerText = nsTeam;
+      document.getElementById('labelTeamW').innerText = ewTeam;
+      document.getElementById('labelTeamE').innerText = ewTeam;
+
+      document.getElementById('inputNorth').value = t.N || '';
+      document.getElementById('inputSouth').value = t.S || '';
+      document.getElementById('inputEast').value = t.E || '';
+      document.getElementById('inputWest').value = t.W || '';
+
+      const datalist = document.getElementById('teammateList');
+      datalist.innerHTML = '';
+      let collectedNames = new Set();
+      for (let tK in m.tables) {
+        let tb = m.tables[tK];
+        if (tb.N) collectedNames.add(tb.N);
+        if (tb.S) collectedNames.add(tb.S);
+        if (tb.E) collectedNames.add(tb.E);
+        if (tb.W) collectedNames.add(tb.W);
+      }
+      collectedNames.forEach(name => {
+        let opt = document.createElement('option');
+        opt.value = name;
+        datalist.appendChild(opt);
+      });
+
+      const modal = document.getElementById('seatingModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeSeatingModal() {
+      document.getElementById('seatingModal').classList.remove('flex');
+      document.getElementById('seatingModal').classList.add('hidden');
+    }
+
+    function saveSeatingModal() {
+      if (!db.currentMatch || !currentTableKey) return;
+      db.matches[db.currentMatch].tables[currentTableKey] = {
+        N: document.getElementById('inputNorth').value.trim(),
+        S: document.getElementById('inputSouth').value.trim(),
+        E: document.getElementById('inputEast').value.trim(),
+        W: document.getElementById('inputWest').value.trim()
+      };
+      closeSeatingModal();
+      saveAndRefresh();
+    }
+
+    function renderAdminPanel() {
+      refreshAdminMatchList();
+      refreshAdminResultDropdown();
+
+      if (!db.currentMatch || !db.matches[db.currentMatch]) return;
+      const m = db.matches[db.currentMatch];
+      const cfg = m.config;
+      const isClosed = m.status === 'closed';
+
+      document.getElementById('editingMatchTitle').innerText = db.currentMatch;
+      document.getElementById('matchStateBadge').innerText = m.status.toUpperCase();
+      document.getElementById('matchStateBadge').className = `px-2 py-0.5 rounded font-bold ${isClosed ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+
+      document.getElementById('editTeams').value = cfg.totalTeams;
+      document.getElementById('editBoards').value = cfg.boardsCount;
+      document.getElementById('editMovement').value = cfg.movement;
+
+      document.getElementById('editTeams').disabled = !isClosed;
+      document.getElementById('editBoards').disabled = !isClosed;
+      document.getElementById('editMovement').disabled = !isClosed;
+
+      const warningEl = document.getElementById('editLockedWarning');
+      if (isClosed) warningEl.classList.add('hidden');
+      else warningEl.classList.remove('hidden');
+
+      const totalTeams = cfg.totalTeams;
+      const boardsPerRound = cfg.boardsCount;
+      let tablesNeeded = getActiveTablesCount(totalTeams);
+
+      let placementHTML = "";
+      for (let i = 1; i <= tablesNeeded; i++) {
+        let startB = ((i - 1) * boardsPerRound) + 1;
+        let endB = i * boardsPerRound;
+        placementHTML += `<div>• <b>Boards ${startB} - ${endB}</b> placed at <b>Table ${i}</b> (Team ${i} Station).</div>`;
+      }
+
+      let prepHTML = `
+        <div>• <b>Active Match:</b> ${db.currentMatch}</div>
+        <div>• <b>Movement System:</b> ${cfg.movement}</div>
+        <div>• <b>Total Teams / Tables:</b> ${totalTeams} Teams (${tablesNeeded} Tables active).</div>
+        <div>• <b>Boards per Round:</b> ${boardsPerRound} boards per table.</div>
+        <div class="border-t border-amber-200 pt-1 mt-1 font-bold text-amber-900">Exact Board Placement:</div>
+        ${placementHTML}
+      `;
+      document.getElementById('materialPrepContent').innerHTML = prepHTML;
+
+      renderAdminStandingsForSelectedMatch();
+    }
+
+    function refreshAdminResultDropdown() {
+      const select = document.getElementById('adminResultMatchSelect');
+      if (!select) return;
+
+      let allKeys = Object.keys(db.matches);
+      if (allKeys.length === 0) {
+        select.innerHTML = '<option value="">-- No Match Available --</option>';
+        return;
+      }
+
+      let currentSelected = select.value && db.matches[select.value] ? select.value : (db.currentMatch || allKeys[0]);
+      
+      select.innerHTML = '';
+      allKeys.forEach(mName => {
+        let m = db.matches[mName];
+        let opt = document.createElement('option');
+        opt.value = mName;
+        opt.innerText = `${mName} (${(m.status || 'open').toUpperCase()})`;
+        if (mName === currentSelected) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function renderAdminStandingsForSelectedMatch() {
+      const select = document.getElementById('adminResultMatchSelect');
+      const targetMatchName = select && select.value ? select.value : db.currentMatch;
+      if (!targetMatchName || !db.matches[targetMatchName]) return;
+
+      const m = db.matches[targetMatchName];
+      const cfg = m.config;
+      let standingsHTML = "";
+
+      for (let i = 1; i <= cfg.totalTeams; i++) {
+        let tKey = `Table${i}`;
+        let tScores = m.scores[tKey] || [];
+        let totalImp = tScores.reduce((acc, cur) => acc + (cur.scoring.score || 0), 0);
+        
+        let vp = 10 + (totalImp / 10);
+        if (vp > 20) vp = 20;
+        if (vp < 0) vp = 0;
+        vp = vp.toFixed(2);
+
+        standingsHTML += `
+          <tr>
+            <td class="border p-2 font-bold">Team ${i} (Table ${i})</td>
+            <td class="border p-2 text-blue-600 font-bold">${totalImp >= 0 ? '+' + totalImp : totalImp} IMPs</td>
+            <td class="border p-2 text-purple-700 font-black">${vp} VP</td>
+            <td class="border p-2 text-green-600 font-semibold">${(m.status || 'open').toUpperCase()}</td>
+          </tr>
+        `;
+      }
+      document.getElementById('adminTableBody').innerHTML = standingsHTML;
+    }
+
+    function refreshAdminMatchList() {
+      const container = document.getElementById('adminMatchListContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      for (let mName in db.matches) {
+        let m = db.matches[mName];
+        let isOpen = m.status === 'open';
+        let isCurrent = mName === db.currentMatch;
+
+        let div = document.createElement('div');
+        div.className = "flex justify-between items-center bg-white p-2 rounded border text-xs";
+        div.innerHTML = `
+          <div onclick="db.currentMatch='${mName}'; saveAndRefresh(); renderAdminPanel();" class="cursor-pointer flex-1">
+            <span class="font-bold ${isCurrent ? 'text-blue-600 underline' : 'text-slate-800'}">${mName}</span>
+            <span class="ml-2 text-[10px] px-1.5 py-0.5 rounded font-bold ${isOpen ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${isOpen ? 'OPEN' : 'CLOSED'}</span>
+          </div>
+          <div class="flex gap-1">
+            <button onclick="toggleMatchStatus('${mName}')" class="px-2 py-1 rounded font-bold text-[10px] ${isOpen ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}">
+              ${isOpen ? 'Close' : 'Open'}
+            </button>
+            <button onclick="deleteMatchByAdmin('${mName}')" ${isOpen ? 'disabled class="opacity-50 cursor-not-allowed px-2 py-1 rounded font-bold text-[10px] bg-red-100 text-red-700"' : 'class="px-2 py-1 rounded font-bold text-[10px] bg-red-600 text-white hover:bg-red-700"'}>
+              Delete
+            </button>
+          </div>
+        `;
+        container.appendChild(div);
+      }
+    }
+
+    function renderMovementSummary() {
+      if (!db.currentMatch || !db.matches[db.currentMatch] || !currentTableKey) return;
+      const m = db.matches[db.currentMatch];
+      const cfg = m.config;
+      const activeTable = m.tables[currentTableKey] || { N: '', S: '', E: '', W: '' };
+      const container = document.getElementById('movementSummaryCard');
+      if (!container) return;
+
+      let tablesNeeded = getActiveTablesCount(cfg.totalTeams);
+      let tableNum = parseInt(currentTableKey.replace('Table', ''));
+      let nextTable = tableNum < tablesNeeded ? tableNum + 1 : 1;
+
+      let startB = ((tableNum - 1) * cfg.boardsCount) + 1;
+      let endB = tableNum * cfg.boardsCount;
+
+      container.innerHTML = `
+        <div class="bg-slate-50 p-3 rounded-lg border space-y-2 text-xs">
+          <div class="font-bold text-slate-700">Match: <span class="text-indigo-600">${db.currentMatch}</span> | System: <span class="text-blue-600">${cfg.movement}</span></div>
+          <div class="text-slate-600">Assigned Boards for this station: <b>Boards ${startB} - ${endB}</b> (${cfg.boardsCount} boards).</div>
+          <div class="border-t pt-2 space-y-1">
+            <div class="font-bold text-slate-800">📍 Current Location: <span class="text-purple-600">${currentTableKey}</span></div>
+            <div>• <b>North:</b> ${activeTable.N || '(Unassigned)'}</div>
+            <div>• <b>South:</b> ${activeTable.S || '(Unassigned)'}</div>
+            <div>• <b>East:</b> ${activeTable.E || '(Unassigned)'}</div>
+            <div>• <b>West:</b> ${activeTable.W || '(Unassigned)'}</div>
+          </div>
+          <div class="border-t pt-2 text-[11px] text-amber-700 bg-amber-50 p-2 rounded">
+            👉 <b>Transition:</b> Play Boards ${startB}-${endB} at ${currentTableKey}, then move to Table ${nextTable}.
+          </div>
+        </div>
+      `;
+    }
+
+    function calculateRawScore(level, suit, declarer, dbl, resultStr, vul) {
+      if (!level || !suit || !declarer || dbl === "" || resultStr === "") return null;
+      const l = parseInt(level);
+      const res = parseInt(resultStr);
+      const isVul = (vul === 'All') || 
+                    (vul === 'N-S' && (declarer === 'N' || declarer === 'S')) || 
+                    (vul === 'E-W' && (declarer === 'E' || declarer === 'W'));
+
+      if (res < 0) {
+        let penalty = Math.abs(res) * (dbl === 'X' ? (isVul ? 200 : 100) : (isVul ? 100 : 50));
+        let finalPenalty = -penalty;
+        if (declarer === 'E' || declarer === 'W') finalPenalty = -finalPenalty;
+        return finalPenalty;
+      }
+
+      let trickPts = (suit === 'NT') ? 40 + (l - 1) * 30 : l * ((suit === '♣' || suit === '♦') ? 20 : 30);
+      if (dbl === 'X') trickPts *= 2;
+      if (dbl === 'XX') trickPts *= 4;
+
+      let score = trickPts + (trickPts >= 100 ? (isVul ? 500 : 300) : 50);
+      if (l === 6) score += isVul ? 750 : 500;
+      if (l === 7) score += isVul ? 1500 : 1000;
+
+      if (res > 0) {
+        score += res * (dbl === 'X' ? (isVul ? 200 : 100) : ((suit === '♣' || suit === '♦') ? 20 : 30));
+      }
+
+      if (declarer === 'E' || declarer === 'W') score = -score;
+      return score;
+    }
+
+    function selectContract(idx, lvl, suit) {
+      const target = getTargetScoring(idx);
+      if (!target || target.status === 'confirmed') return;
+      target.level = lvl.toString();
+      target.suit = suit;
+      target.declarer = ""; target.dbl = ""; target.result = ""; target.score = null;
+      saveAndRefresh();
+    }
+
+    function selectDeclarer(idx, dir) {
+      const target = getTargetScoring(idx);
+      if (!target || target.status === 'confirmed') return;
+      target.declarer = dir;
+      target.dbl = ""; target.result = ""; target.score = null;
+      saveAndRefresh();
+    }
+
+    function selectDouble(idx, dblVal) {
+      const target = getTargetScoring(idx);
+      if (!target || target.status === 'confirmed') return;
+      target.dbl = dblVal;
+      target.result = ""; target.score = null;
+      saveAndRefresh();
+    }
+
+    function selectResult(idx, resVal) {
+      const m = db.matches[db.currentMatch];
+      if (!m || !currentTableKey) return;
+      const b = m.scores[currentTableKey][idx];
+      const target = getTargetScoring(idx);
+      if (!target || target.status === 'confirmed') return;
+      target.result = resVal.toString();
+      target.score = calculateRawScore(target.level, target.suit, target.declarer, target.dbl, target.result, b.vul);
+      target.status = target.score !== null ? 'pending' : 'draft';
+      saveAndRefresh();
+    }
+
+    function getTargetScoring(idx) {
+      if (!db.currentMatch || !db.matches[db.currentMatch] || !currentTableKey) return null;
+      return db.matches[db.currentMatch].scores[currentTableKey][idx].scoring;
+    }
+
+    function confirmScore(idx) {
+      let t = getTargetScoring(idx);
+      if (t) t.status = 'confirmed';
+      saveAndRefresh();
+    }
+
+    function editScore(idx) {
+      let t = getTargetScoring(idx);
+      if (t) t.status = 'pending';
+      saveAndRefresh();
+    }
+
+    function handleHandRecordPhoto(idx, event) {
+      const file = event.target.files[0];
+      if (!file || !currentTableKey) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        db.matches[db.currentMatch].scores[currentTableKey][idx].handRecordPhoto = { name: file.name, dataUrl: e.target.result };
+        saveAndRefresh();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleTravelerPhoto(idx, event) {
+      const file = event.target.files[0];
+      if (!file || !currentTableKey) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        db.matches[db.currentMatch].scores[currentTableKey][idx].travelerPhoto = { name: file.name, dataUrl: e.target.result };
+        saveAndRefresh();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function saveDB() {
+      localStorage.setItem("bridge_app_db", JSON.stringify(db));
+    }
+
+    function saveAndRefresh() {
+      saveDB();
+      refreshMatchDropdowns();
+      renderAll();
+      if (!document.getElementById('viewAdmin').classList.contains('hidden')) {
+        renderAdminPanel();
+      }
+    }
+
+    function renderAll() {
+      const bannerEl = document.getElementById('globalRosterBanner');
+      const container = document.getElementById('boardsList');
+      if (!bannerEl || !container) return;
+
+      if (!db.currentMatch || !db.matches[db.currentMatch] || !currentTableKey) {
+        bannerEl.innerHTML = `<div class="max-w-xl mx-auto font-bold text-amber-300">⚠️ Please select Match and Active Table above.</div>`;
+        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-500 text-sm">Select Match & Table, then click Join Match.</div>`;
+        return;
+      }
+
+      const m = db.matches[db.currentMatch];
+      initMatchStructure(db.currentMatch);
+
+      let bannerHTML = `<div class="flex justify-between items-center w-full font-bold border-b border-slate-700 pb-1 mb-1"><span class="text-yellow-300">Active Match: ${db.currentMatch} | Table: ${currentTableKey}</span></div>`;
+      
+      for (let tKey in m.tables) {
+        let t = m.tables[tKey];
+        let nsStr = (t.N || t.S) ? `${t.N || 'N'}, ${t.S || 'S'}` : 'N/S Unassigned';
+        let ewStr = (t.E || t.W) ? `${t.E || 'E'}, ${t.W || 'W'}` : 'E/W Unassigned';
+        bannerHTML += `<div class="flex justify-between items-center w-full text-[11px]"><span class="text-blue-300">📍 ${tKey}:</span> <span class="text-slate-100 font-semibold">[NS: ${nsStr}] vs [EW: ${ewStr}]</span></div>`;
+      }
+      bannerEl.innerHTML = `<div class="max-w-xl mx-auto flex flex-col gap-0.5">${bannerHTML}</div>`;
+
+      container.innerHTML = '';
+      let tableScores = m.scores[currentTableKey] || [];
+      let activeTable = m.tables[currentTableKey] || { N: '', S: '', E: '', W: '' };
+      let totalTableScore = tableScores.reduce((acc, cur) => acc + (cur.scoring.score || 0), 0);
+
+      tableScores.forEach((b, idx) => {
+        let myData = b.scoring;
+        const isLocked = myData.status === 'confirmed';
+        const step1Done = !!myData.level && !!myData.suit;
+        const step2Done = step1Done && !!myData.declarer;
+        const step3Done = step2Done && myData.dbl !== "";
+
+        let matrixHtml = `<div class="grid grid-cols-5 gap-1">`;
+        for (let l = 1; l <= 7; l++) {
+          suits.forEach(s => {
+            const isSelected = myData.level == l && myData.suit === s;
+            const colorClass = (s === '♥' || s === '♦') ? 'text-red-600' : 'text-slate-800';
+            matrixHtml += `<button ${isLocked ? 'disabled' : ''} onclick="selectContract(${idx}, ${l}, '${s}')" class="contract-btn ${isSelected ? 'selected' : ''} ${colorClass}">${l}${s}</button>`;
+          });
+        }
+        matrixHtml += `</div>`;
+
+        let declarerHtml = step1Done && !isLocked ? `
+          <div class="mt-3 pt-2 border-t border-slate-100">
+            <div class="text-[11px] font-bold text-slate-500 mb-2">Step 2: Select Declarer:</div>
+            <div class="flex flex-col items-center max-w-[220px] mx-auto gap-1">
+              <button onclick="selectDeclarer(${idx}, 'N')" class="step-btn w-36 truncate ${myData.declarer === 'N' ? 'selected' : ''}">North (${activeTable.N || 'N'})</button>
+              <div class="flex gap-4 w-full justify-between">
+                <button onclick="selectDeclarer(${idx}, 'W')" class="step-btn w-24 truncate ${myData.declarer === 'W' ? 'selected' : ''}">West (${activeTable.W || 'W'})</button>
+                <button onclick="selectDeclarer(${idx}, 'E')" class="step-btn w-24 truncate ${myData.declarer === 'E' ? 'selected' : ''}">East (${activeTable.E || 'E'})</button>
+              </div>
+              <button onclick="selectDeclarer(${idx}, 'S')" class="step-btn w-36 truncate ${myData.declarer === 'S' ? 'selected' : ''}">South (${activeTable.S || 'S'})</button>
+            </div>
+          </div>
+        ` : '';
+
+        let doubleHtml = step2Done && !isLocked ? `
+          <div class="mt-3 pt-2 border-t border-slate-100">
+            <div class="text-[11px] font-bold text-slate-500 mb-1">Step 3: Select Double:</div>
+            <div class="flex gap-1.5">
+              <button onclick="selectDouble(${idx}, 'NONE')" class="step-btn flex-1 py-2 ${myData.dbl === 'NONE' ? 'selected' : ''}">None</button>
+              <button onclick="selectDouble(${idx}, 'X')" class="step-btn flex-1 py-2 ${myData.dbl === 'X' ? 'selected-dbl' : ''}">X (Dbl)</button>
+              <button onclick="selectDouble(${idx}, 'XX')" class="step-btn flex-1 py-2 ${myData.dbl === 'XX' ? 'selected-dbl' : ''}">XX (Rdbl)</button>
+            </div>
+          </div>
+        ` : '';
+
+        let resultHtml = '';
+        if (step3Done && !isLocked) {
+          let overBtns = '', underBtns = '';
+          for (let i = 1; i <= 7 - parseInt(myData.level); i++) overBtns += `<button onclick="selectResult(${idx}, '${i}')" class="res-btn ${myData.result == i ? 'selected' : ''}">+${i}</button>`;
+          for (let i = 1; i <= parseInt(myData.level) + 6; i++) underBtns += `<button onclick="selectResult(${idx}, '${-i}')" class="res-btn ${myData.result == -i ? 'selected' : ''}">-${i}</button>`;
+          resultHtml = `
+            <div class="mt-3 pt-2 border-t border-slate-100 space-y-2">
+              <div class="text-[11px] font-bold text-slate-500">Step 4: Select Result:</div>
+              ${overBtns ? `<div class="grid grid-cols-7 gap-1">${overBtns}</div>` : ''}
+              <button onclick="selectResult(${idx}, '0')" class="w-full py-2.5 rounded-lg border text-base font-black shadow-sm ${myData.result === '0' ? 'bg-blue-600 text-white border-blue-700' : 'bg-blue-50 border-blue-300 text-blue-700'}">= (Made)</button>
+              ${underBtns ? `<div class="grid grid-cols-7 gap-1">${underBtns}</div>` : ''}
+            </div>
+          `;
+        }
+
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-2";
+        card.innerHTML = `
+          <div class="flex justify-between items-center border-b pb-2">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-base text-slate-800">Board ${b.boardNum}</span>
+              <span class="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600">Vul: ${b.vul}</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+            <label class="bg-slate-800 text-white py-1 rounded cursor-pointer text-center font-bold">
+              ${b.handRecordPhoto ? '✅ Change Hand Rec' : 'Upload Hand Rec'}
+              <input type="file" accept="image/*" onchange="handleHandRecordPhoto(${idx}, event)" class="hidden">
+            </label>
+            <label class="bg-blue-600 text-white py-1 rounded cursor-pointer text-center font-bold">
+              ${b.travelerPhoto ? '✅ Change Traveler' : 'Upload Traveler'}
+              <input type="file" accept="image/*" onchange="handleTravelerPhoto(${idx}, event)" class="hidden">
+            </label>
+          </div>
+          <div><div class="text-[11px] font-bold text-slate-500 mb-1">Step 1: Select Contract:</div>${matrixHtml}</div>
+          ${declarerHtml} ${doubleHtml} ${resultHtml}
+          <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs mt-3">
+            <div>
+              <span class="font-bold text-slate-700">Contract:</span> 
+              <span class="font-bold text-blue-600">${myData.level ? myData.level + myData.suit : '-'}${myData.declarer ? ' by ' + myData.declarer : ''}</span>
+              <br><span class="font-bold text-slate-700">Score:</span> <span class="font-black text-slate-900">${myData.score !== null ? myData.score : '-'}</span>
+            </div>
+            <div>
+              ${myData.status === 'pending' ? `<button onclick="confirmScore(${idx})" class="bg-green-600 text-white font-bold px-3 py-1.5 rounded text-xs">✅ Confirm</button>` : myData.status === 'confirmed' ? `<button onclick="editScore(${idx})" class="bg-slate-200 text-slate-700 font-bold px-2.5 py-1 rounded text-xs">✏️ Edit</button>` : ''}
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      document.getElementById('matchSummaryTitle').innerText = `${currentTableKey} Cumulative Raw Score`;
+      document.getElementById('teamAScore').innerText = totalTableScore;
+    }
+
+    // 初始化調用
+    initMatchStructure(db.currentMatch);
+    refreshMatchDropdowns();
+  </script>
+</body>
+</html>
